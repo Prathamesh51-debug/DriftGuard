@@ -31,3 +31,24 @@ Per `planner.md` (Part 5, Phase 0 Go/No-Go #1), we needed to determine whether t
 - **No Fallback Needed:** We will use native `PayPal-Mock-Response` headers for F3 (Instrument Declined) and F4 (Duplicate Invoice ID).
 - **Audit ID Established:** Confirmed that PayPal returns `debug_id` even on 422 declines, satisfying Rule #2 (*"Every verdict traces to PayPal IDs"*).
 
+
+---
+
+## [2026-10-29] Spike 2 Outcome: mitmproxy Reverse Mode Interception
+- **Author:** Role A (Engine)
+- **Status:** APPROVED / PASSED
+- **Trace Request ID:** `driftguard-spike2-d6a21455`
+
+### Context
+Per `planner.md` (Part 5, Phase 0 Go/No-Go #2), verify that `mitmproxy` in reverse mode (`--mode reverse:https://api-m.sandbox.paypal.com`) successfully intercepts HTTPS sandbox calls, forwards requests transparently to PayPal without SSL negotiation failure, and extracts `PayPal-Request-Id` for audit logging.
+
+### Experiment
+1. Spun up Docker Compose service `proxy` with `mitmproxy/mitmproxy:10.2.0` in reverse mode on ports 8080 (traffic) and 8081 (mitmweb UI).
+2. Loaded addon `engine/proxy/addons/logger.py` to inspect HTTPFlow objects.
+3. Executed `engine/spikes/spike_2_proxy_test.py` pointing at `http://localhost:8080/v1/oauth2/token` with header `PayPal-Request-Id: driftguard-spike2-d6a21455`.
+
+### Result & Verdict
+- **HTTP Status:** `200 OK`
+- **Access Token:** Received valid PayPal sandbox access token.
+- **mitmweb Telemetry:** Complete flow inspected at `http://localhost:8081` showing Host header rewriting, `PayPal-Request-Id`, and 733B payload.
+- **Verdict:** **PASSED**. Reverse proxy architecture verified; base interceptor ready for F1-F4 chaos addon implementations.

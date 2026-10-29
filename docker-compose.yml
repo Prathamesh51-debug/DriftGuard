@@ -1,0 +1,52 @@
+services:
+  # ============================================================================
+  # PostgreSQL: Job queue & audit store (SKIP LOCKED queue)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: driftguard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-driftguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-driftguard}
+      POSTGRES_DB: ${POSTGRES_DB:-driftguard}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-driftguard} -d ${POSTGRES_DB:-driftguard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # mitmproxy: Fault-injection reverse proxy
+  # Intercepts sandbox traffic and injects network drops & mock responses
+  # ============================================================================
+  proxy:
+    image: mitmproxy/mitmproxy:10.2.0
+    container_name: driftguard-proxy
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: >
+      mitmweb
+      --mode reverse:https://api-m.sandbox.paypal.com
+      --listen-host 0.0.0.0
+      --listen-port 8080
+      --web-host 0.0.0.0
+      --set web_port=8081
+      --set ssl_insecure=true
+      --scripts /home/mitmproxy/addons/logger.py
+    ports:
+      - "${PROXY_PORT:-8080}:8080"      # Intercepted proxy endpoint
+      - "${PROXY_WEB_PORT:-8081}:8081"  # mitmweb UI for inspecting live flows
+    volumes:
+      - ./engine/proxy/addons:/home/mitmproxy/addons:ro
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+

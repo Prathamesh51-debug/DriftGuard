@@ -151,7 +151,7 @@ Page 3
 |#|Own|Steps|Pass When|If it Fails (Fallback)|Status|
 |---|---|---|---|---|
 |1|A|Create order. Approve manually. Capture withPayPal-<br>Mock-Response: {"mock_application_codes":<br>"INSTRUMENT_DECLINED"}. Verify endpoints behavior.|Sandbox<br>returns mocked<br>error on<br>capture.|Drop F3/F4 as PayPal<br>errors; keep proxy-made<br>errors only.|✅ **PASSED (29 Oct)**<br>HTTP 422 INSTRUMENT_DECLINED verified|
-|2|A|Docker mitmproxy reverse mode. Target resolves via<br>extra_hosts/network alias. Inject CA trust. Run SDK script.|Calls appear in<br>proxy log; app<br>still works.|Base-URL override targets<br>only; list in README.|Pending|
+|2|A|Docker mitmproxy reverse mode. Target resolves via<br>extra_hosts/network alias. Inject CA trust. Run SDK script.|Calls appear in<br>proxy log; app<br>still works.|Base-URL override targets<br>only; list in README.|✅ **PASSED (29 Oct)**<br>Reverse proxy intercepts & logs flows|
 |3|C|Script creates order. Playwright logs in as sandbox buyer,<br>consents, waits for return URL. API captures. Run 10x.|Approved &<br>captured with<br>no human.|Pre-approve orders for<br>video/demo; live buyer stays<br>manual.|Pending|
 |4|B|Write tree-sitter queries for 5 repos. Run, hand-label true<br>sites, record found/missed.|Finds sites in 4<br>of 5 repos.|Narrow scanner to<br>TypeScript only.|Pending|
 |5|C|Launch APIMatic MCP. Ask for "capture order idempotency"<br>in TS. Check against SDK typings.|Fixer gets<br>correct SDK<br>usage.|Build curated patch<br>templates in IDE manually.|Pending|
