@@ -62,6 +62,8 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 * `/targets/demo-shop` - A deliberately vulnerable sandbox commerce app seeded with 10 exact bugs to test the harness.
 * `/contracts` - Shared Pydantic schemas validating the JSON pipeline between the AI and the execution engine.
 
+See [`docs/repo-ownership.md`](docs/repo-ownership.md) for who leads and reviews each folder, and [`docs/planner.md`](docs/planner.md) for the day-by-day execution plan.
+
 ## Contributors
 
 Team Pixentropy 
