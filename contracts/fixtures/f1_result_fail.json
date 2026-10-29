@@ -1,0 +1,29 @@
+{
+  "scenario_id": "f1-capture-lost-001",
+  "verdict": "FAIL",
+  "rule": "captures_per_purchase == 1",
+  "observed": {
+    "captures": 2,
+    "amount_captured": "77.94",
+    "orders_created": 1,
+    "refunds_issued": 0
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "5O190127TN364715T"
+    ],
+    "paypal_capture_ids": [
+      "2GG6923447384114H",
+      "8RR1983056129841P"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "req_01jb294z1q0001",
+      "req_01jb294z1q0002"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "buyer charged twice: +38.97 USD",
+  "error_message": null
+}
+

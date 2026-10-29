@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "description": "Immutable audit trail of live PayPal Sandbox IDs and proxy logs.",
+      "properties": {
+        "paypal_order_ids": {
+          "description": "IDs of PayPal orders involved",
+          "items": {
+            "type": "string"
+          },
+          "title": "Paypal Order Ids",
+          "type": "array"
+        },
+        "paypal_capture_ids": {
+          "description": "IDs of PayPal captures created",
+          "items": {
+            "type": "string"
+          },
+          "title": "Paypal Capture Ids",
+          "type": "array"
+        },
+        "paypal_refund_ids": {
+          "description": "IDs of PayPal refunds created",
+          "items": {
+            "type": "string"
+          },
+          "title": "Paypal Refund Ids",
+          "type": "array"
+        },
+        "proxy_log_refs": {
+          "description": "UUIDs or log hashes in mitmproxy jsonl log",
+          "items": {
+            "type": "string"
+          },
+          "title": "Proxy Log Refs",
+          "type": "array"
+        },
+        "webhook_event_ids": {
+          "description": "IDs of webhooks observed or replayed",
+          "items": {
+            "type": "string"
+          },
+          "title": "Webhook Event Ids",
+          "type": "array"
+        }
+      },
+      "title": "Evidence",
+      "type": "object"
+    },
+    "ObservedState": {
+      "additionalProperties": true,
+      "description": "Actual state observed across PayPal sandbox ledger and local target app.",
+      "properties": {
+        "captures": {
+          "description": "Number of completed captures in PayPal ledger",
+          "minimum": 0,
+          "title": "Captures",
+          "type": "integer"
+        },
+        "amount_captured": {
+          "description": "Total amount captured as decimal string",
+          "title": "Amount Captured",
+          "type": "string"
+        },
+        "orders_created": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of orders created in PayPal",
+          "title": "Orders Created"
+        },
+        "refunds_issued": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "description": "Number of refunds issued in PayPal",
+          "title": "Refunds Issued"
+        }
+      },
+      "required": [
+        "captures",
+        "amount_captured"
+      ],
+      "title": "ObservedState",
+      "type": "object"
+    },
+    "Verdict": {
+      "description": "Evaluation verdict decided deterministically by code (never an LLM).",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "ERROR"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Result Contract (Output from Role A Reconciler).\nConsumed by Role C Dashboard UI and Explainer/Fixer.",
+  "properties": {
+    "scenario_id": {
+      "description": "The scenario_id this result corresponds to",
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Verdict",
+      "description": "Deterministic test verdict"
+    },
+    "rule": {
+      "description": "The mathematical or ledger rule tested, e.g. 'captures_per_purchase == 1'",
+      "title": "Rule",
+      "type": "string"
+    },
+    "observed": {
+      "$ref": "#/$defs/ObservedState",
+      "description": "State observed from PayPal's ground truth API"
+    },
+    "evidence": {
+      "$ref": "#/$defs/Evidence",
+      "description": "Verifiable PayPal IDs and proxy log references"
+    },
+    "money_impact": {
+      "description": "Plain-text financial summary, e.g. 'buyer charged twice: +38.97 USD'",
+      "title": "Money Impact",
+      "type": "string"
+    },
+    "error_message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "System error details if verdict is ERROR",
+      "title": "Error Message"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "verdict",
+    "rule",
+    "observed",
+    "evidence",
+    "money_impact"
+  ],
+  "title": "Result",
+  "type": "object"
+}

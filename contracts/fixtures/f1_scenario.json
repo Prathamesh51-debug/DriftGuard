@@ -1,0 +1,20 @@
+{
+  "scenario_id": "f1-capture-lost-001",
+  "fault": "F1_LOST_CAPTURE_RESPONSE",
+  "description": "Forward capture to PayPal sandbox, get 201 Created, kill response before app receives it to test blind retry",
+  "target_call": {
+    "file": "src/checkout.ts",
+    "line": 88,
+    "method": "OrdersController.captureOrder"
+  },
+  "inject": {
+    "on": "POST .../capture",
+    "action": "drop_response_after_upstream"
+  },
+  "expect": {
+    "captures_per_purchase": 1,
+    "amount": "38.97",
+    "currency": "USD"
+  }
+}
+
