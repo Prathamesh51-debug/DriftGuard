@@ -76,3 +76,30 @@ Per `planner.md` (Part 6: Phase 1 Vertical Slice), implement Proxy v1 with JSONL
 - **PayPal Sandbox Ledger:** `COMPLETED` (`3SR16091KV8213005`)
 - **JSONL Audit Trail:** Validated in `logs/proxy_traffic.jsonl` with SHA-256 body hash `e3b0c442...` and duration `2218ms`.
 - **Verdict:** **GATE CLEARED**. The proxy reliably separates app-perceived failure from actual PayPal financial state.
+
+---
+
+## [2026-10-29] Spike 3 Outcome: Headless Playwright Buyer Approval
+- **Author:** Role C (AI + Fixes)
+- **Status:** APPROVED / PASSED
+- **Result:** 10/10 approved and captured with no human, ~12s per run
+
+### Context
+Per `planner.md` (Part 5, Phase 0 Go/No-Go #3), chaos runs cannot wait for a person to click through PayPal's approval page. We needed to know whether headless Playwright can log in as the sandbox buyer, approve an order, and reach the return URL reliably.
+
+### Experiment
+1. Authenticated against `https://api-m.sandbox.paypal.com` and created a `$10.00 USD` order with `return_url` set to `http://localhost:3000/return`.
+2. Opened the order's `payer-action` link in headless Chromium, logged in as the sandbox Personal buyer, and clicked *Complete Purchase*.
+3. Waited for the redirect to the return URL (nothing listens there, so the request is stubbed in the browser).
+4. Captured the order (`POST /v2/checkout/orders/{id}/capture`) and checked for `201 COMPLETED`.
+5. Repeated 10 times, then re-ran through the Python module `ai/buyer_driver/` (5/5).
+
+### Result & Verdict
+- **Pass rate:** 10/10 in the Node spike, 5/5 through `ai/buyer_driver/live_check.py`.
+- **Duration:** ~11-14s per run in the spike, ~8-9s through the Python module.
+- **Verdict:** **PASSED**. No fallback needed; pre-approved orders are not required for the demo or video.
+
+### Impact on Pipeline
+- **Module:** `ai/buyer_driver/approve_order(approve_url, return_url)` returns an `ApprovalResult`. It stops at the redirect and does not capture, so the orchestrator's capture call stays visible to the proxy.
+- **Selectors:** `#email`, `#btnNext`, `#password`, `#btnLogin`, and the *Complete Purchase* button. All live in `ai/buyer_driver/paypal_selectors.py` so a PayPal page change is a one-file fix.
+- **Hand-off:** A can call the driver from the orchestrator (due 30 Oct). `ApprovalResult` is local until `contracts/` defines it.
