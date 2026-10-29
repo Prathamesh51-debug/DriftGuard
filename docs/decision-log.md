@@ -103,3 +103,31 @@ Per `planner.md` (Part 5, Phase 0 Go/No-Go #3), chaos runs cannot wait for a per
 - **Module:** `ai/buyer_driver/approve_order(approve_url, return_url)` returns an `ApprovalResult`. It stops at the redirect and does not capture, so the orchestrator's capture call stays visible to the proxy.
 - **Selectors:** `#email`, `#btnNext`, `#password`, `#btnLogin`, and the *Complete Purchase* button. All live in `ai/buyer_driver/paypal_selectors.py` so a PayPal page change is a one-file fix.
 - **Hand-off:** A can call the driver from the orchestrator (due 30 Oct). `ApprovalResult` is local until `contracts/` defines it.
+
+---
+
+## [2026-10-29] Spike 5 Outcome: APIMatic Context Plugin for SDK Patch Generation
+- **Author:** Role C (AI + Fixes)
+- **Status:** APPROVED / PASSED
+- **Result:** Guidance matches the SDK typings; sample compiles under `tsc --strict`
+
+### Context
+Per `planner.md` (Part 5, Phase 0 Go/No-Go #5), the Fixer needs the APIMatic Context Plugin to give correct PayPal SDK usage, so patches use real method names and parameters. If it failed, the fallback was hand-written patch templates.
+
+### Experiment
+1. Installed the plugin in Claude Code (`/plugin marketplace add apimatic/context-matic`, then `/plugin install context-matic@apimatic`) and completed the browser OAuth login. The server is hosted at `https://chatbotapi.apimatic.io/mcp/plugins`.
+2. `fetch_api` (typescript, key `paypal`) returned the PayPal Server SDK.
+3. `ask`: "capture an order idempotently so a retried capture after a network timeout does not double charge".
+4. `endpoint_search` (`captureOrder`) and `model_search` for the request and response shapes.
+5. Installed `@paypal/paypal-server-sdk@2.0.0` in a scratch folder, compared the plugin's `captureOrder` signature with the real typings, and compiled its sample with `tsc --strict`.
+
+### Result & Verdict
+- **Guidance:** Use the same `paypalRequestId` on the capture and on any retry. The SDK sends it as the `PayPal-Request-Id` header. This is the F1 fix we need.
+- **Signature match:** `captureOrder({ id, paypalMockResponse, paypalRequestId, prefer, paypalClientMetadataId, paypalAuthAssertion, body })` matches the typings exactly.
+- **Compile check:** The sample compiles with no errors against SDK 2.0.0.
+- **Verdict:** **PASSED**. The fallback patch templates are not needed.
+
+### Impact on Pipeline
+- **Fixer (C5):** Can draw SDK usage from `ask`, `endpoint_search` and `model_search`. Pin `@paypal/paypal-server-sdk@2.0.0`, the version the plugin recommends.
+- **Known inaccuracy:** The plugin's text says a successful capture returns `200 OK`. Real sandbox captures return `201`. The Fixer and its checks must not assume `200`.
+- **Access:** Each developer must install the plugin and complete the OAuth login once. `APIMATIC_API_KEY` in `.env.example` is not used by this server.

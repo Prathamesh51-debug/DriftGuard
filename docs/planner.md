@@ -154,7 +154,7 @@ Page 3
 |2|A|Docker mitmproxy reverse mode. Target resolves via<br>extra_hosts/network alias. Inject CA trust. Run SDK script.|Calls appear in<br>proxy log; app<br>still works.|Base-URL override targets<br>only; list in README.|✅ **PASSED (29 Oct)**<br>Reverse proxy intercepts & logs flows|
 |3|C|Script creates order. Playwright logs in as sandbox buyer,<br>consents, waits for return URL. API captures. Run 10x.|Approved &<br>captured with<br>no human.|Pre-approve orders for<br>video/demo; live buyer stays<br>manual.|✅ **PASSED (29 Oct)**<br>10/10 headless approve + capture, ~12s per run|
 |4|B|Write tree-sitter queries for 5 repos. Run, hand-label true<br>sites, record found/missed.|Finds sites in 4<br>of 5 repos.|Narrow scanner to<br>TypeScript only.|Pending|
-|5|C|Launch APIMatic MCP. Ask for "capture order idempotency"<br>in TS. Check against SDK typings.|Fixer gets<br>correct SDK<br>usage.|Build curated patch<br>templates in IDE manually.|Pending|
+|5|C|Launch APIMatic MCP. Ask for "capture order idempotency"<br>in TS. Check against SDK typings.|Fixer gets<br>correct SDK<br>usage.|Build curated patch<br>templates in IDE manually.|✅ **PASSED (29 Oct)**<br>APIMatic idempotent-capture guidance compiles against SDK 2.0.0 typings|
 |6|A|Can hosted worker run target + proxy?|Confirmed yes.|Run as processes in worker,<br>or small VM, or replay demo<br>mode.|Pending|
 
 
