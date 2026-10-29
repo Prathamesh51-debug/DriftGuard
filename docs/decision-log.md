@@ -52,3 +52,27 @@ Per `planner.md` (Part 5, Phase 0 Go/No-Go #2), verify that `mitmproxy` in rever
 - **Access Token:** Received valid PayPal sandbox access token.
 - **mitmweb Telemetry:** Complete flow inspected at `http://localhost:8081` showing Host header rewriting, `PayPal-Request-Id`, and 733B payload.
 - **Verdict:** **PASSED**. Reverse proxy architecture verified; base interceptor ready for F1-F4 chaos addon implementations.
+
+---
+
+## [2026-10-29] Phase 1 Vertical Slice: F1 Lost Capture & JSONL Audit Log
+- **Author:** Role A (Engine)
+- **Status:** APPROVED / GATE CLEARED
+- **Order ID:** `2EY23628X22941825`
+- **Real PayPal Capture ID:** `3SR16091KV8213005`
+- **Injected Status:** `HTTP 504 Gateway Timeout`
+
+### Context
+Per `planner.md` (Part 6: Phase 1 Vertical Slice), implement Proxy v1 with JSONL structured audit logging and Fault F1 (`drop_response`) action. Validate that the proxy intercepts an approved capture, lets PayPal charge the account (201), drops the response (substituting 504 Timeout), and captures the real capture ID in `logs/proxy_traffic.jsonl`.
+
+### Experiment & Verification
+1. Loaded `engine/proxy/addons/f1_lost_capture.py` into `driftguard-proxy` with mounted `./logs` volume.
+2. Executed `engine/spikes/test_f1_lost_capture.py`.
+3. Completed buyer approval for order `2EY23628X22941825`.
+4. Triggered capture with `X-DriftGuard-Fault: F1` and `PayPal-Request-Id: driftguard-f1-c71314bc`.
+
+### Result & Verdict
+- **Client Observed:** `HTTP 504 Gateway Timeout`
+- **PayPal Sandbox Ledger:** `COMPLETED` (`3SR16091KV8213005`)
+- **JSONL Audit Trail:** Validated in `logs/proxy_traffic.jsonl` with SHA-256 body hash `e3b0c442...` and duration `2218ms`.
+- **Verdict:** **GATE CLEARED**. The proxy reliably separates app-perceived failure from actual PayPal financial state.

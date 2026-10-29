@@ -30,6 +30,7 @@ services:
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
+      - DRIFTGUARD_FAULT=${DRIFTGUARD_FAULT:-}
     command: >
       mitmweb
       --mode reverse:https://api-m.sandbox.paypal.com
@@ -38,12 +39,13 @@ services:
       --web-host 0.0.0.0
       --set web_port=8081
       --set ssl_insecure=true
-      --scripts /home/mitmproxy/addons/logger.py
+      --scripts /home/mitmproxy/addons/f1_lost_capture.py
     ports:
       - "${PROXY_PORT:-8080}:8080"      # Intercepted proxy endpoint
       - "${PROXY_WEB_PORT:-8081}:8081"  # mitmweb UI for inspecting live flows
     volumes:
       - ./engine/proxy/addons:/home/mitmproxy/addons:ro
+      - ./logs:/home/mitmproxy/logs     # Structured JSONL audit trail
     depends_on:
       - postgres
 
