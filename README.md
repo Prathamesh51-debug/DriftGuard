@@ -34,8 +34,8 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 
 1. **Clone & Configure**
    ```bash
-   git clone https://github.com/your-org/driftguard.git
-   cd driftguard
+   git clone https://github.com/Prathamesh51-debug/DriftGuard.git
+   cd DriftGuard
    cp .env.example .env
    # Add your PayPal Sandbox Client ID, Secret, and Anthropic API key
    ```
