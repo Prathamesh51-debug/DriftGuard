@@ -1,0 +1,42 @@
+:root {
+  --bg: #0d1015;
+  --panel: #12161c;
+  --panel-2: #171c24;
+  --line: #262d38;
+  --text: #e6e9ee;
+  --muted: #9aa4b2;
+  --accent: #5b9dff;
+  --red: #ff6b6b;
+  --red-bg: #3a1c20;
+  --green: #4cd98a;
+  --green-bg: #17301f;
+  --amber: #f5b84b;
+  --amber-bg: #3a2e14;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+.mono {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
