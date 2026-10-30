@@ -1,0 +1,91 @@
+# DriftGuard Demo Shop - Seeded Vulnerabilities Catalog
+# Planner Ref: Part 5 (Phase 0) & Part 10 (Fault Matrix)
+
+target_name: "driftguard-demo-shop"
+stack: "Express + TypeScript + @paypal/paypal-server-sdk@2.0.0"
+
+bugs:
+  - id: "BUG-01"
+    fault: "F1_LOST_CAPTURE_RESPONSE"
+    name: "Blind retry on capture timeout without PayPal-Request-Id"
+    file: "src/checkout.ts"
+    target_line: 88
+    status: "active"
+    trigger: "HTTP 504 Gateway Timeout or dropped connection after upstream 201"
+    safe_behavior: "Pass deterministic PayPal-Request-Id header; query order status before retry"
+    failure_mode: "Double charge: PayPal captures twice, application reports 1 purchase"
+
+  - id: "BUG-02"
+    fault: "F2_SLOW_PAYPAL"
+    name: "Blind retry on createOrder timeout"
+    file: "src/checkout.ts"
+    target_line: 37
+    status: "dormant"
+    trigger: "Delay > 5000ms on POST /v2/checkout/orders"
+    safe_behavior: "Send deterministic PayPal-Request-Id on order creation"
+
+  - id: "BUG-03"
+    fault: "F3_FORCED_DECLINE"
+    name: "Unhanded 422 INSTRUMENT_DECLINED marks order complete"
+    file: "src/checkout.ts"
+    target_line: 110
+    status: "dormant"
+    trigger: "PayPal-Mock-Response: {'mock_application_codes': 'INSTRUMENT_DECLINED'}"
+    safe_behavior: "Keep order unpaid, surface INSTRUMENT_DECLINED to buyer"
+
+  - id: "BUG-04"
+    fault: "F4_DUPLICATE_INVOICE"
+    name: "Non-deterministic invoice_id randomly generated"
+    file: "src/checkout.ts"
+    status: "dormant"
+    trigger: "Duplicate invoice error"
+    safe_behavior: "Derive deterministic invoice_id from cart SHA-256 hash"
+
+  - id: "BUG-05"
+    fault: "F5_MONEY_MATH_TRAP"
+    name: "Floating point math precision error on sales tax"
+    file: "src/checkout.ts"
+    status: "dormant"
+    trigger: "Tax calculation rounds down by $0.04"
+    safe_behavior: "Integer minor-units or Decimal arithmetic"
+
+  - id: "BUG-06"
+    fault: "F5_MONEY_MATH_TRAP"
+    name: "Coupon discount subtraction mismatch"
+    file: "src/checkout.ts"
+    status: "dormant"
+    trigger: "Item total does not equal sum of unit prices"
+    safe_behavior: "Strict line item sum validation"
+
+  - id: "BUG-07"
+    fault: "F5_MONEY_MATH_TRAP"
+    name: "Zero-decimal currency rounding error (JPY/KRW)"
+    file: "src/checkout.ts"
+    status: "dormant"
+    trigger: "Submitting fractional amount for JPY currency"
+    safe_behavior: "Currency exponent lookup table"
+
+  - id: "BUG-08"
+    fault: "F6_WEBHOOK_REPLAY"
+    name: "Unverified webhook signature accepted"
+    file: "src/webhooks.ts"
+    status: "dormant"
+    trigger: "Spoofed or unauthenticated POST /api/webhooks"
+    safe_behavior: "Call /v1/notifications/verify-webhook-signature before processing"
+
+  - id: "BUG-09"
+    fault: "F6_WEBHOOK_REPLAY"
+    name: "Duplicate webhook event processing"
+    file: "src/webhooks.ts"
+    status: "dormant"
+    trigger: "Replay same webhook event_id multiple times"
+    safe_behavior: "Idempotent event processing with processed_events set"
+
+  - id: "BUG-10"
+    fault: "F7_PROMPT_INJECTION"
+    name: "AI customer support assistant triggers unauthorized refund"
+    file: "src/assistant.ts"
+    status: "dormant"
+    trigger: "Prompt injection asking for refund over policy limit"
+    safe_behavior: "Deterministic code guardrail; human review for refund amounts"
+

@@ -1,0 +1,91 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createCheckoutOrder, captureCheckoutOrder } from './checkout';
+import { shopState } from './state';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const port = parseInt(process.env.DEMO_SHOP_PORT || '3001', 10);
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '../public')));
+
+/**
+ * Health check endpoint
+ */
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    app: 'driftguard-demo-shop',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * DriftGuard State Inspection Endpoint
+ * Queried by the Reconciler to verify internal application drift against PayPal.
+ */
+app.get('/_driftguard/state', (_req: Request, res: Response) => {
+  res.json(shopState.getState());
+});
+
+/**
+ * Reset internal state for test resets
+ */
+app.post('/_driftguard/reset', (_req: Request, res: Response) => {
+  shopState.reset();
+  res.json({ status: 'reset', state: shopState.getState() });
+});
+
+/**
+ * Create Order Endpoint
+ * Called by checkout UI or orchestrator runner.
+ */
+app.post('/api/orders', async (req: Request, res: Response) => {
+  try {
+    const amount = req.body?.amount || '38.97';
+    const result = await createCheckoutOrder(amount);
+    res.status(201).json(result);
+  } catch (error: any) {
+    console.error('[DemoShop] Create order error:', error);
+    res.status(500).json({
+      error: 'ORDER_CREATION_FAILED',
+      message: error?.message || 'Failed to create PayPal order',
+    });
+  }
+});
+
+/**
+ * Capture Order Endpoint
+ * Contains BUG-01 vulnerability (blind retry on network timeout).
+ */
+app.post('/api/orders/:id/capture', async (req: Request, res: Response) => {
+  try {
+    const orderId = req.params.id;
+    const result = await captureCheckoutOrder(orderId);
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(502).json(result);
+    }
+  } catch (error: any) {
+    console.error('[DemoShop] Capture error:', error);
+    res.status(500).json({
+      error: 'CAPTURE_FAILED',
+      message: error?.message || 'Failed to capture PayPal order',
+    });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`[DemoShop] DriftGuard Demo Shop listening at http://localhost:${port}`);
+  console.log(`[DemoShop] Internal state endpoint: http://localhost:${port}/_driftguard/state`);
+});
+
+export default app;
+

@@ -1,0 +1,20 @@
+--- a/targets/demo-shop/src/checkout.ts
++++ b/targets/demo-shop/src/checkout.ts
+@@ -12,3 +12,4 @@
+ import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
+ import { ordersController } from './paypal';
+ import { shopState } from './state';
++import crypto from 'crypto';
+ 
+@@ -82,3 +83,5 @@
+ export async function captureCheckoutOrder(orderId: string, maxRetries: number = 2): Promise<CaptureResult> {
++  // Deriving deterministic idempotency key for PayPal-Request-Id header (APIMatic best practice)
++  const paypalRequestId = crypto.createHash('sha256').update(`capture-${orderId}`).digest('hex');
+   let attempts = 0;
+   let lastError: any = null;
+@@ -88,3 +91,4 @@
+       const { result } = await ordersController.captureOrder({
+         id: orderId,
+         prefer: 'return=representation',
++        paypalRequestId,
+       });
