@@ -14,7 +14,8 @@ Reply with ONE JSON object and nothing else:
 
 Rules for the diff:
 - Smallest change that makes the safe behaviour true. No refactors, no formatting changes.
-- Change only the file named in the bug entry. Paths are relative to the app root: --- a/src/checkout.ts / +++ b/src/checkout.ts.
+- The diff must be a standard unified diff, the format `git diff` prints: "--- a/src/checkout.ts", "+++ b/src/checkout.ts", then "@@ ... @@" hunks. Never use the "*** Begin Patch" format.
+- Change only the file named in the bug entry. Paths are relative to the app root.
 - Include 3 lines of unchanged context around every change. Do not include the "NN| " line-number prefixes.
 - Use only SDK options listed under SDK notes. Do not invent APIs.
 """

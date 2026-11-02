@@ -7,13 +7,11 @@ After 3 rejected attempts it falls back to a template built straight from the
 Result, so the dashboard always has an explanation that is safe to show.
 """
 
-import json
-import re
 from typing import List, Optional
 
 from pydantic import BaseModel
 
-from ai.fixer.llm import LLMClient  # moves to ai/common when the team adapter lands
+from ai.fixer.llm import LLMClient, LLMError, extract_json  # moves to ai/common when the team adapter lands
 from contracts import Result, Scenario, Verdict
 
 from .prompt import SYSTEM_PROMPT, build_user_prompt
@@ -28,13 +26,14 @@ class Explanation(BaseModel):
     what_happened: str
     impact: str
     source: str  # "llm" or "template"
+    provider: Optional[str] = None  # which model answered, when source is "llm"
     attempts: int
     rejected: List[str] = []  # why earlier model attempts were refused
 
 
 def _parse_reply(raw: str) -> dict:
-    data = json.loads(re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip()))
-    if not isinstance(data, dict) or not all(isinstance(data.get(f), str) and data[f].strip() for f in FIELDS):
+    data = extract_json(raw)
+    if not all(isinstance(data.get(f), str) and data[f].strip() for f in FIELDS):
         raise ValueError(f"reply must be a JSON object with non-empty text for {', '.join(FIELDS)}")
     return data
 
@@ -65,7 +64,11 @@ def explain(result: Result, scenario: Scenario, llm: LLMClient, *, max_attempts:
     rejected: List[str] = []
     feedback: Optional[str] = None
     for attempt in range(1, max_attempts + 1):
-        raw = llm.complete(SYSTEM_PROMPT, build_user_prompt(result, scenario, feedback))
+        try:
+            raw = llm.complete(SYSTEM_PROMPT, build_user_prompt(result, scenario, feedback))
+        except LLMError as exc:  # every provider is down: use the template
+            rejected.append(f"No model available: {exc}")
+            break
         try:
             reply = _parse_reply(raw)
         except ValueError as exc:  # json.JSONDecodeError is a ValueError
@@ -74,7 +77,8 @@ def explain(result: Result, scenario: Scenario, llm: LLMClient, *, max_attempts:
             problems = verify_text([reply[f] for f in FIELDS], result, scenario)
             if not problems:
                 return Explanation(**{f: reply[f].strip() for f in FIELDS},
-                                   source="llm", attempts=attempt, rejected=rejected)
+                                   source="llm", provider=getattr(llm, "last_provider", None),
+                                   attempts=attempt, rejected=rejected)
         feedback = "; ".join(problems)
         rejected.append(feedback)
 

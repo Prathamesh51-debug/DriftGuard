@@ -7,8 +7,6 @@ applies cleanly to a copy of the app. It never edits the original. The verdict
 that the fix works still comes from re-running the chaos scenario.
 """
 
-import json
-import re
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,7 +15,7 @@ from pydantic import BaseModel
 from contracts import Result, Scenario, Verdict
 
 from .bugs import BugEntry
-from .llm import LLMClient
+from .llm import LLMClient, LLMError, extract_json
 from .patcher import check_diff, normalize_diff
 from .prompt import SYSTEM_PROMPT, build_user_prompt
 
@@ -28,6 +26,7 @@ class FixProposal(BaseModel):
     bug_id: str
     applies: bool
     source: str  # "llm" or "known_fix"
+    provider: Optional[str] = None  # which model answered, when source is "llm"
     diff: Optional[str] = None
     explanation: Optional[str] = None
     files: List[str] = []
@@ -37,9 +36,8 @@ class FixProposal(BaseModel):
 
 
 def _parse_reply(raw: str) -> dict:
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip())
-    data = json.loads(text)
-    if not isinstance(data, dict) or not isinstance(data.get("diff"), str) or not data["diff"].strip():
+    data = extract_json(raw)
+    if not isinstance(data.get("diff"), str) or not data["diff"].strip():
         raise ValueError('reply must be a JSON object with a non-empty "diff" string')
     return data
 
@@ -66,7 +64,11 @@ def propose_fix(
     error: Optional[str] = None
 
     for attempt in range(1, max_attempts + 1):
-        raw = llm.complete(SYSTEM_PROMPT, build_user_prompt(result, scenario, bug, source, error))
+        try:
+            raw = llm.complete(SYSTEM_PROMPT, build_user_prompt(result, scenario, bug, source, error))
+        except LLMError as exc:  # every provider is down: skip straight to the curated patch
+            error = f"No model available: {exc}"
+            break
         try:
             reply = _parse_reply(raw)
         except ValueError as exc:  # json.JSONDecodeError is a ValueError
@@ -76,7 +78,7 @@ def propose_fix(
         check = check_diff(diff, shop_dir, allowed_file=bug.file)
         if check.ok:
             return FixProposal(
-                bug_id=bug.id, applies=True, source="llm", diff=diff,
+                bug_id=bug.id, applies=True, source="llm", provider=getattr(llm, "last_provider", None), diff=diff,
                 explanation=reply.get("explanation"), files=check.files,
                 lines_changed=check.lines_changed, attempts=attempt,
             )
