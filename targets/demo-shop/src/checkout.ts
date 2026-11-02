@@ -6,7 +6,9 @@
  * - BUG-01 (F1 Lost Capture): Capture timeout blind retry without idempotency key.
  *   When mitmproxy drops the HTTP 201 response and injects a 504 Gateway Timeout,
  *   this controller catches the error and blindly retries captureOrder without
- *   sending a deterministic PayPal-Request-Id header, causing duplicate charges.
+ *   sending a deterministic PayPal-Request-Id header. PayPal rejects the retry with
+ *   422 ORDER_ALREADY_CAPTURED, causing the application to report failure and record
+ *   0 captures even though the buyer was charged (state drift / lost order).
  */
 
 import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';

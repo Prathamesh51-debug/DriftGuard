@@ -1,12 +1,13 @@
 {
   "scenario_id": "f1-capture-lost-001",
   "verdict": "PASS",
-  "rule": "captures_per_purchase == 1",
+  "rule": "app_recorded_captures == captures",
   "observed": {
     "captures": 1,
     "amount_captured": "38.97",
     "orders_created": 1,
-    "refunds_issued": 0
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
   },
   "evidence": {
     "paypal_order_ids": [
@@ -25,4 +26,3 @@
   "money_impact": "clean: exactly one capture (+38.97 USD)",
   "error_message": null
 }
-

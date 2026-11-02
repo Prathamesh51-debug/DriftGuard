@@ -1,20 +1,27 @@
+diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.ts
 --- a/targets/demo-shop/src/checkout.ts
 +++ b/targets/demo-shop/src/checkout.ts
-@@ -12,3 +12,4 @@
+@@ -14,6 +14,7 @@
  import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
  import { ordersController } from './paypal';
  import { shopState } from './state';
 +import crypto from 'crypto';
  
-@@ -82,3 +83,5 @@
+ export interface CreateOrderResult {
+   orderId: string;
+@@ -81,6 +82,7 @@
+  * BUG-01: Contains blind retry loop without PayPal-Request-Id on network drops.
+  */
  export async function captureCheckoutOrder(orderId: string, maxRetries: number = 2): Promise<CaptureResult> {
-+  // Deriving deterministic idempotency key for PayPal-Request-Id header (APIMatic best practice)
 +  const paypalRequestId = crypto.createHash('sha256').update(`capture-${orderId}`).digest('hex');
    let attempts = 0;
    let lastError: any = null;
-@@ -88,3 +91,4 @@
+   while (attempts <= maxRetries) {
+@@ -90,6 +92,7 @@
        const { result } = await ordersController.captureOrder({
          id: orderId,
          prefer: 'return=representation',
 +        paypalRequestId,
+         // BUG-01: Missing paypalRequestId (idempotency key)!
+         // When proxy drops response with 504, retry sends another capture without idempotency.
        });

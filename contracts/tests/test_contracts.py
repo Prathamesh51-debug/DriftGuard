@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from contracts.models import (
+    ApprovalResult,
     Evidence,
     Expectation,
     FaultType,
@@ -44,10 +45,11 @@ def test_f1_result_fail_fixture():
 
     assert result.scenario_id == "f1-capture-lost-001"
     assert result.verdict == Verdict.FAIL
-    assert result.observed.captures == 2
-    assert result.observed.amount_captured == "77.94"
+    assert result.observed.captures == 1
+    assert result.observed.amount_captured == "38.97"
+    assert result.observed.app_recorded_captures == 0
     assert len(result.evidence.paypal_order_ids) == 1
-    assert "buyer charged twice" in result.money_impact
+    assert "buyer charged" in result.money_impact
 
 
 def test_f1_result_pass_fixture():
@@ -59,7 +61,20 @@ def test_f1_result_pass_fixture():
     assert result.verdict == Verdict.PASS
     assert result.observed.captures == 1
     assert result.observed.amount_captured == "38.97"
+    assert result.observed.app_recorded_captures == 1
     assert "clean" in result.money_impact
+
+
+def test_approval_result_model():
+    res = ApprovalResult(
+        approved=True,
+        order_id="5O190127TN364715T",
+        payer_id="PAYER123",
+        return_url="http://localhost:3000/return?token=5O190127TN364715T&PayerID=PAYER123",
+        duration_s=8.5,
+    )
+    assert res.approved is True
+    assert res.order_id == "5O190127TN364715T"
 
 
 def test_extra_fields_forbidden():

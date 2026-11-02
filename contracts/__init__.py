@@ -4,6 +4,7 @@ Provides canonical Scenario and Result schemas, validation helpers, and enums.
 """
 
 from .models import (
+    ApprovalResult,
     Evidence,
     Expectation,
     FaultType,
@@ -16,6 +17,7 @@ from .models import (
 )
 
 __all__ = [
+    "ApprovalResult",
     "FaultType",
     "Verdict",
     "TargetCall",

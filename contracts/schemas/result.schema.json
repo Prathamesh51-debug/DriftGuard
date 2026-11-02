@@ -90,6 +90,20 @@
           "default": 0,
           "description": "Number of refunds issued in PayPal",
           "title": "Refunds Issued"
+        },
+        "app_recorded_captures": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number of captures recorded in target app local state",
+          "title": "App Recorded Captures"
         }
       },
       "required": [

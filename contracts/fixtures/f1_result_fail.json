@@ -1,20 +1,20 @@
 {
   "scenario_id": "f1-capture-lost-001",
   "verdict": "FAIL",
-  "rule": "captures_per_purchase == 1",
+  "rule": "app_recorded_captures == captures",
   "observed": {
-    "captures": 2,
-    "amount_captured": "77.94",
+    "captures": 1,
+    "amount_captured": "38.97",
     "orders_created": 1,
-    "refunds_issued": 0
+    "refunds_issued": 0,
+    "app_recorded_captures": 0
   },
   "evidence": {
     "paypal_order_ids": [
       "5O190127TN364715T"
     ],
     "paypal_capture_ids": [
-      "2GG6923447384114H",
-      "8RR1983056129841P"
+      "2GG6923447384114H"
     ],
     "paypal_refund_ids": [],
     "proxy_log_refs": [
@@ -23,7 +23,6 @@
     ],
     "webhook_event_ids": []
   },
-  "money_impact": "buyer charged twice: +38.97 USD",
+  "money_impact": "buyer charged, but app recorded 0 captures: 38.97 USD paid without fulfillment",
   "error_message": null
 }
-

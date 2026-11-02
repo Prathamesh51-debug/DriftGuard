@@ -13,7 +13,7 @@ bugs:
     status: "active"
     trigger: "HTTP 504 Gateway Timeout or dropped connection after upstream 201"
     safe_behavior: "Pass deterministic PayPal-Request-Id header; query order status before retry"
-    failure_mode: "Double charge: PayPal captures twice, application reports 1 purchase"
+    failure_mode: "Order lost / state drift: PayPal captures payment ($38.97), but un-idempotent retry receives 422 ORDER_ALREADY_CAPTURED and application marks order FAILED (0 captures recorded)"
 
   - id: "BUG-02"
     fault: "F2_SLOW_PAYPAL"
@@ -26,7 +26,7 @@ bugs:
 
   - id: "BUG-03"
     fault: "F3_FORCED_DECLINE"
-    name: "Unhanded 422 INSTRUMENT_DECLINED marks order complete"
+    name: "Unhandled 422 INSTRUMENT_DECLINED marks order complete"
     file: "src/checkout.ts"
     target_line: 110
     status: "dormant"

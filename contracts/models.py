@@ -97,6 +97,7 @@ class ObservedState(BaseModel):
     amount_captured: str = Field(..., description="Total amount captured as decimal string")
     orders_created: Optional[int] = Field(None, ge=0, description="Number of orders created in PayPal")
     refunds_issued: Optional[int] = Field(0, ge=0, description="Number of refunds issued in PayPal")
+    app_recorded_captures: Optional[int] = Field(None, ge=0, description="Number of captures recorded in target app local state")
 
     @field_validator("amount_captured")
     @classmethod
@@ -135,3 +136,16 @@ class Result(BaseModel):
     evidence: Evidence = Field(..., description="Verifiable PayPal IDs and proxy log references")
     money_impact: str = Field(..., description="Plain-text financial summary, e.g. 'buyer charged twice: +38.97 USD'")
     error_message: Optional[str] = Field(None, description="System error details if verdict is ERROR")
+
+
+class ApprovalResult(BaseModel):
+    """Output from headless buyer driver approval (Role C)."""
+    model_config = ConfigDict(extra="forbid")
+
+    approved: bool = Field(..., description="True if buyer approved payment in browser")
+    order_id: Optional[str] = Field(None, description="PayPal Order ID from return URL query")
+    payer_id: Optional[str] = Field(None, description="PayPal Payer ID from return URL query")
+    return_url: Optional[str] = Field(None, description="Final redirect URL reached")
+    duration_s: float = Field(..., ge=0.0, description="Duration of browser interaction in seconds")
+    error: Optional[str] = Field(None, description="Error message if approval failed")
+    screenshot_path: Optional[str] = Field(None, description="Path to debug screenshot if failed")
