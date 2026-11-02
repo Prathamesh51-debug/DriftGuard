@@ -38,6 +38,7 @@ export interface ObservedState {
   amount_captured: string
   orders_created: number | null
   refunds_issued: number | null
+  app_recorded_captures?: number | null
 }
 
 export interface Evidence {
