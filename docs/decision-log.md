@@ -131,3 +131,31 @@ Per `planner.md` (Part 5, Phase 0 Go/No-Go #5), the Fixer needs the APIMatic Con
 - **Fixer (C5):** Can draw SDK usage from `ask`, `endpoint_search` and `model_search`. Pin `@paypal/paypal-server-sdk@2.0.0`, the version the plugin recommends.
 - **Known inaccuracy:** The plugin's text says a successful capture returns `200 OK`. Real sandbox captures return `201`. The Fixer and its checks must not assume `200`.
 - **Access:** Each developer must install the plugin and complete the OAuth login once. `APIMATIC_API_KEY` in `.env.example` is not used by this server.
+
+
+---
+
+## [2026-11-02] Contracts v1.1 & F1 Ground Truth Realignment
+- **Author:** Role B (AI + Attacks) in consensus with Role C (AI + Fixes)
+- **Status:** APPROVED / CONSENSUS REACHED
+
+### Context & Findings
+Sandbox execution confirmed that retrying `OrdersController.captureOrder` without `PayPal-Request-Id` after a dropped HTTP 201 does **not** create a second capture. Instead, PayPal rejects the repeat capture with `422 Unprocessable Entity: ORDER_ALREADY_CAPTURED`. Because the target application only catches 504 and network errors, it breaks out of the retry loop and marks the order as `FAILED` (recording 0 captures), while the buyer was actually charged ($38.97 USD).
+
+### Decisions & Changes
+1. **Contracts (`contracts/models.py`, `schemas/`):**
+   - Added `app_recorded_captures: Optional[int]` to `ObservedState` so that state drift between PayPal Sandbox records and local merchant application state is explicitly measurable.
+   - Formally added `ApprovalResult` to `contracts/models.py` (standardizing Role C buyer driver outputs across the pipeline).
+   - Exported updated JSON schemas via `contracts/export_schemas.py`.
+2. **Fixtures & Rules (`contracts/fixtures/`):**
+   - Updated `f1_result_fail.json`: PayPal captures = 1, amount = 38.97 USD, `app_recorded_captures` = 0. Rule updated to `app_recorded_captures == captures`.
+   - Updated `f1_result_pass.json`: PayPal captures = 1, `app_recorded_captures` = 1, rule `app_recorded_captures == captures`.
+3. **Demo Shop & Bug Catalog (`targets/demo-shop/`):**
+   - Reworded `checkout.ts` header comments and `bugs.yaml` `BUG-01` failure mode to reflect the true failure ("Order lost / state drift" instead of "Double charge").
+   - Fixed typo in `bugs.yaml` `BUG-03` ("Unhanded" -> "Unhandled").
+4. **Known Fix (`targets/known-fixes/BUG-01.patch`):**
+   - Regenerated with correct hunk counts and inline comment context.
+   - Verified that `git apply --check targets/known-fixes/BUG-01.patch` passes cleanly without output.
+5. **AI Common Adapter (`ai/common/`):**
+   - Adopted the multi-provider LLM adapter into `ai/common/` (exporting Gemini, Groq, Anthropic with spend guard, fallback, and caching).
+   - Re-exported all classes from `ai/fixer/` to maintain 100% backwards compatibility with Role C's tests.

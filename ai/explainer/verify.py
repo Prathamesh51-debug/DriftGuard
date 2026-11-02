@@ -34,7 +34,7 @@ def known_ids(result: Result, scenario: Scenario) -> Set[str]:
 def known_numbers(result: Result, scenario: Scenario) -> Set[Decimal]:
     obs, expect = result.observed, scenario.expect
     raw = [obs.captures, obs.amount_captured, obs.orders_created, obs.refunds_issued,
-           expect.captures_per_purchase, expect.amount]
+           obs.app_recorded_captures, expect.captures_per_purchase, expect.amount]
     numbers = {d for d in (_decimal(str(v)) for v in raw if v is not None) if d is not None}
     for text in (result.money_impact, result.rule, result.error_message or ""):
         numbers |= {Decimal(n) for n in NUMBER.findall(text)}

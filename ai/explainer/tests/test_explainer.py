@@ -26,19 +26,19 @@ def failing():
     return load(Result, "f1_result_fail.json")
 
 
-def reply(headline="Customer was charged twice", what="PayPal shows 2 captures totalling 77.94 USD, but 1 capture of 38.97 was expected.",
-          impact="The buyer paid 38.97 USD too much."):
+def reply(headline="Order lost after capture", what="PayPal shows 1 capture of 38.97 USD, but the app recorded 0 captures.",
+          impact="Buyer paid 38.97 USD without fulfillment."):
     return json.dumps({"headline": headline, "what_happened": what, "impact": impact})
 
 
 def test_grounded_text_is_accepted(failing, scenario):
     out = explain(failing, scenario, ScriptedLLM([reply()]))
     assert out.source == "llm" and out.attempts == 1 and out.rejected == []
-    assert "77.94" in out.what_happened
+    assert "38.97" in out.what_happened
 
 
 def test_known_ids_are_allowed(failing, scenario):
-    what = "Order 5O190127TN364715T has captures 2GG6923447384114H and 8RR1983056129841P."
+    what = "Order 5O190127TN364715T has capture 2GG6923447384114H."
     assert verify_text([what], failing, scenario) == []
 
 
@@ -64,7 +64,7 @@ def test_fault_codes_and_ids_digits_are_not_read_as_numbers(failing, scenario):
 
 
 def test_decimals_compare_by_value(failing, scenario):
-    assert verify_text(["Total captured was 77.940 USD."], failing, scenario) == []
+    assert verify_text(["Total captured was 38.970 USD."], failing, scenario) == []
 
 
 def test_bad_json_is_retried(failing, scenario):

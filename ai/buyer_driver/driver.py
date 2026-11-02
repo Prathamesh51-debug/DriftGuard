@@ -8,7 +8,7 @@ the sandbox buyer, approves the payment and waits for the redirect to the
 order's return URL. It does not capture: the orchestrator captures afterwards,
 so the capture call stays visible to the fault-injection proxy.
 
-ApprovalResult is a local model until the contracts package defines it.
+ApprovalResult is imported from contracts.
 """
 
 import os
@@ -20,23 +20,13 @@ from urllib.parse import parse_qs, urlparse
 from dotenv import load_dotenv
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
-from pydantic import BaseModel
+from contracts import ApprovalResult
 
 from . import paypal_selectors as sel
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 DEFAULT_RETURN_URL = "http://localhost:3000/return"
-
-
-class ApprovalResult(BaseModel):
-    approved: bool
-    order_id: Optional[str] = None
-    payer_id: Optional[str] = None
-    return_url: Optional[str] = None
-    duration_s: float
-    error: Optional[str] = None
-    screenshot_path: Optional[str] = None
 
 
 def approve_order(

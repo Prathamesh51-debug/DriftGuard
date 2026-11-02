@@ -223,8 +223,8 @@ def test_outputs_record_which_provider_answered():
     fix = propose_fix(failing, scenario, find_bug(scenario, load_bugs()), root / "targets/demo-shop", chain)
     assert fix.source == "llm" and fix.provider == "up"  # Down failed, Up answered
 
-    chain = FallbackLLM([Down(), Up(json.dumps({"headline": "Two captures recorded", "what_happened": "PayPal shows 2 captures totalling 77.94 USD.",
-                                                "impact": "The buyer paid 38.97 USD too much."}))])
+    chain = FallbackLLM([Down(), Up(json.dumps({"headline": "One capture recorded", "what_happened": "PayPal shows 1 capture of 38.97 USD, but the app recorded 0 captures.",
+                                                "impact": "Buyer paid 38.97 USD without fulfillment."}))])
     assert explain(failing, scenario, chain).provider == "up"
 
 
