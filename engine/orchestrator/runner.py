@@ -3,9 +3,17 @@ DriftGuard Orchestrator: End-to-End Test Execution State Machine.
 Coordinates: Target App -> Headless Buyer Driver -> Chaos Proxy -> Reconciler.
 """
 
+import sys
 import time
-import requests
+from pathlib import Path
 from typing import Optional
+import requests
+
+# Ensure repo root is in Python path for module resolution
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from contracts import Result, Scenario, Verdict, ObservedState, Evidence
 from engine.reconciler import reconcile_order
 
@@ -108,3 +116,15 @@ def run_scenario(
     )
     print(f"[ORCHESTRATOR] Verdict: {result.verdict.value} | Impact: {result.money_impact}")
     return result
+
+
+if __name__ == "__main__":
+    fixtures_dir = ROOT_DIR / "contracts" / "fixtures"
+    f1_scenario = Scenario.model_validate_json((fixtures_dir / "f1_scenario.json").read_text(encoding="utf-8"))
+    
+    print("=================================================================")
+    print("DRIFTGUARD AUTOMATED CHAOS LOOP: FAULT F1 (LOST CAPTURE RESPONSE)")
+    print("=================================================================")
+    res = run_scenario(f1_scenario)
+    print("\n======================= FINAL RESULT =======================")
+    print(res.model_dump_json(indent=2))

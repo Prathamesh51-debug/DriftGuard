@@ -5,16 +5,21 @@ Rule 1: AI proposes, code decides.
 Rule 2: Every verdict traces to PayPal IDs.
 """
 
+import sys
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import requests
 
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from contracts import Evidence, ObservedState, Result, Scenario, Verdict
 from .client import PayPalClient
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_LOG_PATH = ROOT_DIR / "logs" / "proxy_traffic.jsonl"
+
 
 def harvest_proxy_log_refs(order_id: str, log_path: Optional[Path] = None) -> List[str]:
     """Extract PayPal-Request-Id headers and log references matching the order ID."""
@@ -22,6 +27,7 @@ def harvest_proxy_log_refs(order_id: str, log_path: Optional[Path] = None) -> Li
     refs: List[str] = []
     if not path.exists():
         return refs
+
     try:
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
@@ -33,9 +39,14 @@ def harvest_proxy_log_refs(order_id: str, log_path: Optional[Path] = None) -> Li
                     req_id = entry.get("paypal_request_id")
                     if req_id and req_id != "NOT_SET" and req_id not in refs:
                         refs.append(req_id)
+                    elif entry.get("request_body_hash"):
+                        h_ref = f"hash_{entry['request_body_hash'][:12]}"
+                        if h_ref not in refs:
+                            refs.append(h_ref)
     except Exception:
         pass
     return refs
+
 
 def fetch_app_state(demo_shop_url: str) -> Optional[Dict[str, Any]]:
     """Query target app's internal state endpoint: GET /_driftguard/state."""
@@ -47,6 +58,7 @@ def fetch_app_state(demo_shop_url: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
     return None
+
 
 def reconcile_order(
     scenario: Scenario,
@@ -64,6 +76,7 @@ def reconcile_order(
     # 1. Fetch live PayPal ledger records
     raw_order = paypal.get_order(order_id)
     ledger = paypal.parse_order_ledger(raw_order)
+
     # 2. Fetch demo shop internal state
     app_state = fetch_app_state(demo_shop_url)
     app_captures = None
@@ -76,8 +89,10 @@ def reconcile_order(
         if app_captures is None:
             # Fall back to aggregate if order isn't isolated
             app_captures = app_state.get("totalCapturesRecorded", 0)
+
     # 3. Harvest proxy log references
     proxy_refs = harvest_proxy_log_refs(order_id, log_path)
+
     # 4. Construct ObservedState
     num_captures = len(ledger["captures"])
     observed = ObservedState(
@@ -87,6 +102,7 @@ def reconcile_order(
         refunds_issued=len(ledger["refunds"]),
         app_recorded_captures=app_captures,
     )
+
     # 5. Construct Evidence
     evidence = Evidence(
         paypal_order_ids=[order_id],
@@ -95,9 +111,11 @@ def reconcile_order(
         proxy_log_refs=proxy_refs,
         webhook_event_ids=[],
     )
+
     # 6. Deterministic Verdict Computation (Code decides!)
     rule = "app_recorded_captures == captures"
     expected_captures = scenario.expect.captures_per_purchase
+
     # Check state drift: does app state match PayPal reality?
     if app_captures is not None and app_captures == num_captures and num_captures == expected_captures:
         verdict = Verdict.PASS
@@ -119,6 +137,7 @@ def reconcile_order(
                 f"state drift detected: expected {expected_captures} captures, "
                 f"got {num_captures} in PayPal vs {app_captures} in app"
             )
+
     return Result(
         scenario_id=scenario.scenario_id,
         verdict=verdict,

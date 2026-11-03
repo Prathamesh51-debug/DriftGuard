@@ -186,3 +186,25 @@ Per `planner.md` (Part 2 & Part 6: Role Playbook A), the Engine needs:
    - Coordinates end-to-end execution: creates order, calls Playwright headless buyer approval (`ai.buyer_driver`), triggers capture through chaos proxy, and executes reconciliation.
 4. **API Service (`engine/api/main.py`):**
    - Exposes `/health`, `/runs`, `/runs/{id}`, and `/runs/{id}/rerun` directly compatible with the React + AG Grid Dashboard.
+
+---
+
+## [2026-11-03] Integration Milestone: First 100% Automated Red Result (Phase 1 Gate Cleared)
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID:** `85P354300U488443F`
+- **Real PayPal Capture ID:** `0SV2419179962062Y`
+- **Approval Duration:** `17.53s` (Headless Playwright Chromium)
+- **App Response:** `HTTP 502`
+- **Verdict:** `FAIL`
+
+### Context
+Per `planner.md` (Part 4 & Part 6: Mon 2 Nov Integration Gate), achieve the first red result on the Demo Shop end-to-end with **zero manual steps**.
+
+### Automated Sequence Observed
+1. **Target Order Creation:** `POST http://localhost:3001/api/orders` returned PayPal Order `85P354300U488443F`.
+2. **Headless Buyer Approval:** Role C Playwright driver (`ai.buyer_driver`) logged into Sandbox buyer and clicked Complete Purchase in `17.53s` without any human intervention.
+3. **Chaos Interception & Dropped Response:** Target shop called capture. Proxy intercepted and dropped the `201 Created` response, injecting `504 Gateway Timeout`.
+4. **BUG-01 Reproduction:** Demo shop retried capture blindly without `PayPal-Request-Id`. PayPal returned `422 UNPROCESSABLE_ENTITY (ORDER_ALREADY_CAPTURED)`. Demo shop recorded `0` captures in `/_driftguard/state`.
+5. **Reconciliation:** Reconciler queried live PayPal Ground Truth (Captures = 1, $38.97 USD) and compared with app state (0).
+6. **Verdict Emitted:** `FAIL: buyer charged, but app recorded 0 captures: 38.97 USD paid without fulfillment`.
