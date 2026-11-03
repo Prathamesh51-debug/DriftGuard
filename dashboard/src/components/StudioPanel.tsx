@@ -2,6 +2,7 @@ import { AgStudio, AgStudioProvider } from 'ag-studio-react'
 import { AgStudioAiModule, AgStudioModuleRegistry, studioTheme } from 'ag-studio'
 import type { AgStudioApi } from 'ag-studio'
 import { useEffect, useMemo, useRef } from 'react'
+import { AI_URL } from '../api'
 import type { Run } from '../types'
 import { RUN_FIELDS, toRunRows } from '../studioData'
 import { initialReport } from '../studioReport'
@@ -24,8 +25,6 @@ const theme = studioTheme.withParams({
 })
 
 const LICENCE_KEY: string | undefined = import.meta.env.VITE_AG_STUDIO_KEY
-// The AI service holds the model key; the browser only ever talks to it.
-const AI_URL: string = import.meta.env.VITE_AI_URL ?? 'http://localhost:8001'
 const adapter = createAnthropicAdapter(AI_URL)
 
 export default function StudioPanel({ runs }: { runs: Run[] }) {

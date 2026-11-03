@@ -1,9 +1,12 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { API_URL, launchRun, listRuns, rerunRun } from './api'
-import type { Run } from './types'
+import { API_URL, launchRun, listRuns, proposeFix, rerunRun } from './api'
+import type { FixState, Run } from './types'
 import { RunsGrid } from './components/RunsGrid'
 import { EvidenceDrawer } from './components/EvidenceDrawer'
+import { BeforeAfter } from './components/BeforeAfter'
+import { originalOf, rerunOf } from './beforeAfter'
 import './App.css'
+import './beforeAfter.css'
 
 const StudioPanel = lazy(() => import('./components/StudioPanel'))
 
@@ -35,6 +38,8 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [view, setView] = useState<'runs' | 'studio'>('runs')
+  const [fixes, setFixes] = useState<Record<string, FixState>>({})
+  const [compareBeforeId, setCompareBeforeId] = useState<string | null>(null)
   const wasOffline = useRef(false)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -66,21 +71,49 @@ export default function App() {
     }
   }, [refresh])
 
-  const act = async (fn: () => Promise<Run>) => {
+  const act = async (fn: () => Promise<Run>): Promise<Run | undefined> => {
     setBusy(true)
     setActionError(null)
     try {
       const run = await fn()
       setSelectedId(run.run_id)
       await refresh()
+      return run
     } catch (e) {
       setActionError(`Couldn't start that: ${e instanceof Error ? e.message : 'request failed'}`)
+      return undefined
     } finally {
       setBusy(false)
     }
   }
 
+  const propose = async (run: Run) => {
+    setFixes((f) => ({ ...f, [run.run_id]: { status: 'loading' } }))
+    try {
+      const proposal = await proposeFix(run)
+      setFixes((f) => ({ ...f, [run.run_id]: { status: 'ready', proposal } }))
+    } catch (e) {
+      setFixes((f) => ({ ...f, [run.run_id]: { status: 'error', message: e instanceof Error ? e.message : 'The request failed' } }))
+    }
+  }
+
+  const rerunAndCompare = async (runId: string) => {
+    const rerun = await act(() => rerunRun(runId))
+    if (rerun) setCompareBeforeId(runId)
+  }
+
+  /** A before/after button for a run that has a re-run, or that is one. */
+  const compareFor = (run: Run): { label: string; open: () => void } | null => {
+    const original = originalOf(runs, run)
+    if (original) return { label: 'See before and after', open: () => setCompareBeforeId(original.run_id) }
+    if (rerunOf(runs, run.run_id)) return { label: 'See before and after', open: () => setCompareBeforeId(run.run_id) }
+    return null
+  }
+
   const selected = useMemo(() => runs.find((r) => r.run_id === selectedId) ?? null, [runs, selectedId])
+  const compareBefore = useMemo(() => runs.find((r) => r.run_id === compareBeforeId) ?? null, [runs, compareBeforeId])
+  const compareAfter = compareBefore ? rerunOf(runs, compareBefore.run_id) : undefined
+  const compareFix = compareBeforeId ? fixes[compareBeforeId] : undefined
   const failing = runs.filter((r) => r.result?.verdict === 'FAIL').length
   const passing = runs.filter((r) => r.result?.verdict === 'PASS').length
   const showBanners = offline || reconnected || actionError !== null
@@ -164,8 +197,20 @@ export default function App() {
         <EvidenceDrawer
           run={selected}
           busy={busy}
+          fix={fixes[selected.run_id]}
+          compare={compareFor(selected)}
           onClose={() => setSelectedId(null)}
-          onRerun={(id) => void act(() => rerunRun(id))}
+          onRerun={(id) => void rerunAndCompare(id)}
+          onPropose={() => void propose(selected)}
+        />
+      )}
+
+      {compareBefore && (
+        <BeforeAfter
+          before={compareBefore}
+          after={compareAfter}
+          proposal={compareFix?.status === 'ready' ? compareFix.proposal : undefined}
+          onClose={() => setCompareBeforeId(null)}
         />
       )}
     </div>

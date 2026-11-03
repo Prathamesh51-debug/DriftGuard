@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import type { Result, Run } from '../types'
+import type { FixState, Result, Run } from '../types'
 import { elapsedSeconds, faultLabel, shortId } from '../format'
 import { VerdictChip } from './VerdictChip'
+import { FixPanel } from './FixPanel'
 
 const SLOW_RUN_SECONDS = 60
 
@@ -65,13 +66,19 @@ function IdList({ title, ids }: { title: string; ids: string[] }) {
 export function EvidenceDrawer({
   run,
   busy,
+  fix,
+  compare,
   onClose,
   onRerun,
+  onPropose,
 }: {
   run: Run
   busy: boolean
+  fix: FixState | undefined
+  compare: { label: string; open: () => void } | null
   onClose: () => void
   onRerun: (runId: string) => void
+  onPropose: () => void
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -149,6 +156,13 @@ export function EvidenceDrawer({
               </>
             )}
 
+            {fix && (
+              <>
+                <h3>Proposed fix</h3>
+                <FixPanel state={fix} onRetry={onPropose} />
+              </>
+            )}
+
             <h3>Evidence from PayPal sandbox</h3>
             <IdList title="Order IDs" ids={result.evidence.paypal_order_ids} />
             <IdList title="Capture IDs" ids={result.evidence.paypal_capture_ids} />
@@ -174,11 +188,25 @@ export function EvidenceDrawer({
         {scenario.description && <p className="muted small">{scenario.description}</p>}
       </div>
 
-      {failed && (
+      {(failed || compare) && (
         <footer className="drawer-foot">
-          <button className="btn btn-primary" disabled={busy} onClick={() => onRerun(run.run_id)}>
-            {busy ? 'Re-running…' : 'Re-run after fix'}
-          </button>
+          {compare && (
+            <button className="btn btn-primary" onClick={compare.open}>
+              {compare.label}
+            </button>
+          )}
+          {failed && (
+            <>
+              {fix?.status !== 'ready' && (
+                <button className="btn" disabled={fix?.status === 'loading'} onClick={onPropose}>
+                  {fix?.status === 'loading' ? 'Asking the Fixer…' : 'Propose fix'}
+                </button>
+              )}
+              <button className={`btn ${compare ? '' : 'btn-primary'}`} disabled={busy} onClick={() => onRerun(run.run_id)}>
+                {busy ? 'Re-running…' : 'Re-run after fix'}
+              </button>
+            </>
+          )}
         </footer>
       )}
     </aside>

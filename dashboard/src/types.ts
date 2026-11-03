@@ -67,3 +67,19 @@ export interface Run {
   result: Result | null
   rerun_of: string | null
 }
+
+/** The AI service's answer to POST /fix (mirrors ai.fixer.FixProposal). */
+export interface FixProposal {
+  bug_id: string
+  applies: boolean
+  source: 'llm' | 'known_fix'
+  provider: string | null
+  diff: string | null
+  explanation: string | null
+  files: string[]
+  lines_changed: number
+  attempts: number
+  error: string | null
+}
+
+export type FixState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; proposal: FixProposal }

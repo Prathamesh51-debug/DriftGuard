@@ -7,18 +7,26 @@ never sees a key.
 POST /llm/messages takes an Anthropic Messages request body (system, messages, tools, tool_choice,
 max_tokens) and returns the model's reply. The model is fixed on the server, output is capped, the
 request size is limited, and every call goes through the spend guard.
-Planner Ref: Part 8 (Studio agent skeleton, Wed 4 Nov).
+
+POST /fix takes a failing run's Scenario and Result and returns the Fixer's FixProposal: a diff that
+code has checked (one allowed file, small, applies to a scratch copy). It never edits the shop.
+Planner Ref: Part 8 (Studio agent skeleton, before/after view, Wed 4 Nov).
 """
 
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from ai.common.providers import DEFAULT_MODELS, SpendGuard, _key, cost_usd
+from ai.common.llm import LLMClient, LLMError
+from ai.common.providers import DEFAULT_MODELS, OfflineLLM, SpendGuard, _key, cost_usd, llm_from_env
+from ai.fixer import FixProposal, find_bug, load_bugs, propose_fix
+from contracts import Result, Scenario, Verdict
 
+SHOP_DIR = Path(__file__).resolve().parents[2] / "targets" / "demo-shop"
 MAX_OUTPUT_TOKENS = 2048
 MAX_INPUT_CHARS = 200_000
 MAX_TOOLS = 40
@@ -110,3 +118,33 @@ def llm_messages(req: TurnRequest, backend: Optional[ModelBackend] = Depends(get
         "content": content,
         "usage": {"input_tokens": msg.usage.input_tokens, "output_tokens": msg.usage.output_tokens},
     }
+
+
+class FixRequest(BaseModel):
+    scenario: Scenario
+    result: Result
+
+
+def get_fix_llm() -> LLMClient:
+    """The model chain for the Fixer (DRIFTGUARD_LLM). With no usable key it is offline, so the curated fix is used."""
+    try:
+        return llm_from_env(cache=False)
+    except LLMError:
+        return OfflineLLM()
+
+
+def get_shop_dir() -> Path:
+    return SHOP_DIR
+
+
+@app.post("/fix", response_model=FixProposal)
+def propose(req: FixRequest, llm: LLMClient = Depends(get_fix_llm), shop_dir: Path = Depends(get_shop_dir)) -> FixProposal:
+    if req.result.verdict != Verdict.FAIL:
+        raise HTTPException(422, f"Nothing to fix: the verdict is {req.result.verdict.value}")
+    try:
+        bug = find_bug(req.scenario, load_bugs())
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    if not (shop_dir / bug.file).is_file():
+        raise HTTPException(404, f"{bug.id} is not seeded in the demo shop yet ({bug.file} does not exist)")
+    return propose_fix(req.result, req.scenario, bug, shop_dir, llm)

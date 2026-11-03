@@ -7,8 +7,9 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from ai.common.providers import SpendGuard
-from ai.service.app import ModelBackend, app, get_backend
+from ai.common.llm import ScriptedLLM
+from ai.common.providers import OfflineLLM, SpendGuard
+from ai.service.app import ModelBackend, app, get_backend, get_fix_llm
 
 
 class FakeClient:
@@ -109,3 +110,63 @@ def test_health_reports_whether_a_model_is_ready(make):
     http, _ = make(FakeClient())
     body = http.get("/health").json()
     assert body["model_ready"] is True and body["spend_left_usd"] == 1.5
+
+
+# --- POST /fix: the Fixer behind HTTP -------------------------------------------------------
+
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURES = ROOT / "contracts" / "fixtures"
+SCENARIO = json.loads((FIXTURES / "f1_scenario.json").read_text(encoding="utf-8"))
+FAIL = json.loads((FIXTURES / "f1_result_fail.json").read_text(encoding="utf-8"))
+PASS = json.loads((FIXTURES / "f1_result_pass.json").read_text(encoding="utf-8"))
+GOOD_DIFF = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def fixer():
+    def _use(llm):
+        app.dependency_overrides[get_fix_llm] = lambda: llm
+        return TestClient(app)
+
+    yield _use
+    app.dependency_overrides.clear()
+
+
+def test_fix_returns_a_checked_diff_from_the_model(fixer):
+    llm = ScriptedLLM([json.dumps({"diff": GOOD_DIFF, "explanation": "Send a stable PayPal-Request-Id."})])
+    out = fixer(llm).post("/fix", json={"scenario": SCENARIO, "result": FAIL}).json()
+    assert out["applies"] is True and out["source"] == "llm" and out["bug_id"] == "BUG-01"
+    assert out["files"] == ["src/checkout.ts"] and "paypalRequestId" in out["diff"]
+
+
+def test_fix_falls_back_to_the_curated_patch_when_no_model_is_available(fixer):
+    out = fixer(OfflineLLM()).post("/fix", json={"scenario": SCENARIO, "result": FAIL}).json()
+    assert out["applies"] is True and out["source"] == "known_fix"
+
+
+def test_fix_rejects_a_diff_that_does_not_apply_and_uses_the_curated_patch(fixer):
+    bad_lines = ["diff --git a/src/checkout.ts b/src/checkout.ts", "--- a/src/checkout.ts", "+++ b/src/checkout.ts", "@@ -1,1 +1,1 @@", "-nope", "+nope2", ""]
+    bad = json.dumps({"diff": chr(10).join(bad_lines)})
+    out = fixer(ScriptedLLM([bad, bad, bad])).post("/fix", json={"scenario": SCENARIO, "result": FAIL}).json()
+    assert out["source"] == "known_fix" and out["applies"] is True
+
+
+def test_fix_refuses_a_run_that_did_not_fail(fixer):
+    resp = fixer(OfflineLLM()).post("/fix", json={"scenario": SCENARIO, "result": PASS})
+    assert resp.status_code == 422 and "PASS" in resp.json()["detail"]
+
+
+def test_fix_says_so_when_the_bug_is_not_seeded_in_the_shop_yet(fixer):
+    other = {**SCENARIO, "fault": "F7_PROMPT_INJECTION"}  # BUG-10 is only a dormant entry: no source file yet
+    resp = fixer(OfflineLLM()).post("/fix", json={"scenario": other, "result": FAIL})
+    assert resp.status_code == 404 and "not seeded" in resp.json()["detail"]
+
+
+def test_fix_never_edits_the_shop(fixer):
+    shop_file = ROOT / "targets" / "demo-shop" / "src" / "checkout.ts"
+    before = shop_file.read_bytes()
+    fixer(OfflineLLM()).post("/fix", json={"scenario": SCENARIO, "result": FAIL})
+    assert shop_file.read_bytes() == before

@@ -1,0 +1,141 @@
+.drawer-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diff {
+  margin: 0;
+  padding: 10px 0;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  display: block;
+  width: 100%;
+}
+.diff-line {
+  display: block;
+  padding: 0 12px;
+  white-space: pre;
+}
+.diff-add {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.diff-del {
+  background: var(--red-bg);
+  color: var(--red);
+}
+.diff-hunk {
+  color: var(--accent);
+}
+.diff-meta {
+  color: var(--muted);
+}
+.fix {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.fix p {
+  margin: 0;
+}
+.fix-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 20px;
+  overflow-y: auto;
+  background: rgba(5, 7, 10, 0.78);
+}
+.ba {
+  width: min(1100px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.ba-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.ba-head h2 {
+  font-size: 20px;
+}
+.ba-verdict strong {
+  font-size: 16px;
+}
+.ba-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.ba-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.ba-side header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ba-side p {
+  margin: 0;
+}
+.ba-numbers {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.ba-numbers div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ba-numbers dt {
+  color: var(--muted);
+}
+.ba-numbers dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.ba-diff h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+@media (max-width: 800px) {
+  .ba-sides {
+    grid-template-columns: 1fr;
+  }
+}
