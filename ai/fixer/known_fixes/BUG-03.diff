@@ -1,0 +1,21 @@
+diff --git a/src/checkout.ts b/src/checkout.ts
+--- a/src/checkout.ts
++++ b/src/checkout.ts
+@@ -141,13 +141,14 @@
+       const statusCode = err?.statusCode || err?.response?.status || 504;
+ 
+       // BUG-03: Buggy handler assumes 422 INSTRUMENT_DECLINED means already paid/handled and records success!
++      // BUG-03 fix: Do not treat 422 INSTRUMENT_DECLINED as completed
+       if (statusCode === 422) {
+-        shopState.recordCaptureSuccess(orderId, undefined, '38.97');
+         return {
+-          success: true,
++          success: false,
+           orderId,
+-          status: 'COMPLETED',
++          status: 'FAILED',
+           attempts,
++          error: 'INSTRUMENT_DECLINED',
+         };
+       }
+ 

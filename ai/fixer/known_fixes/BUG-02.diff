@@ -1,0 +1,27 @@
+diff --git a/src/checkout.ts b/src/checkout.ts
+--- a/src/checkout.ts
++++ b/src/checkout.ts
+@@ -12,6 +12,7 @@
+ import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
+ import { ordersController } from './paypal';
+ import { shopState } from './state';
++import crypto from 'crypto';
+ 
+ export interface CreateOrderResult {
+   orderId: string;
+@@ -37,6 +38,7 @@
+ export async function createCheckoutOrder(amount: string = '38.97'): Promise<CreateOrderResult> {
+   const returnUrl = process.env.PAYPAL_RETURN_URL || 'http://localhost:3000/return';
+   const cancelUrl = process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/cancel';
++  const paypalRequestId = crypto.createHash('sha256').update(`create-${amount}`).digest('hex');
+ 
+   let attempts = 0;
+   const maxRetries = 1;
+@@ -71,6 +73,7 @@
+           },
+         },
+         prefer: 'return=representation',
++        paypalRequestId,
+         // BUG-02: Missing paypalRequestId (idempotency key)!
+       });
+ 

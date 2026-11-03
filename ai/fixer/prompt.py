@@ -31,6 +31,26 @@ SDK_NOTES = {
         "lost response gets 422 ORDER_ALREADY_CAPTURED even though the buyer was charged, and the app wrongly marks "
         "the order failed; with it, PayPal returns the original capture result (HTTP 200) so the app can record it."
     ),
+    "F2_SLOW_PAYPAL": (
+        "ordersController.createOrder({ body, prefer, paypalRequestId }) accepts paypalRequestId, which is "
+        "sent as the PayPal-Request-Id header. When network timeouts or delays occur, retrying with the same "
+        "deterministic paypalRequestId ensures PayPal idempotency: PayPal returns the existing order instead of "
+        "creating duplicate orders. Derive paypalRequestId deterministically from the order parameters (for example "
+        "crypto.createHash('sha256').update(`create-${amount}`).digest('hex')). Without it, a retry on timeout creates "
+        "multiple unlinked orders in PayPal."
+    ),
+    "F3_FORCED_DECLINE": (
+        "When ordersController.captureOrder returns HTTP 422 INSTRUMENT_DECLINED, the buyer's payment method was declined "
+        "and $0 was captured by PayPal. The app must NOT treat 422 as completed or call recordCaptureSuccess. Instead, "
+        "it must return failure (status: 'FAILED', success: false) so the order remains unpaid and the buyer is prompted "
+        "to choose a different payment method. Erroneously recording capture success on 422 causes false fulfillment."
+    ),
+    "F4_DUPLICATE_INVOICE": (
+        "In ordersController.createOrder, purchaseUnits[0].invoiceId must be deterministically derived from the order contents "
+        "or cart (for example a hash of cart contents: `INV-${crypto.createHash('sha256').update(`cart-${amount}`).digest('hex').substring(0, 16).toUpperCase()}`) "
+        "instead of using Math.random(). Random invoice IDs make reconciliation impossible and risk duplicate invoice collisions. "
+        "Deterministic invoice IDs guarantee idempotent tracking across order attempts."
+    ),
 }
 
 

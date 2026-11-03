@@ -1,8 +1,7 @@
 diff --git a/src/checkout.ts b/src/checkout.ts
-index 18020ed..ad26a95 100644
 --- a/src/checkout.ts
 +++ b/src/checkout.ts
-@@ -12,6 +12,7 @@
+@@ -14,6 +14,7 @@
  import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
  import { ordersController } from './paypal';
  import { shopState } from './state';
@@ -10,15 +9,15 @@ index 18020ed..ad26a95 100644
  
  export interface CreateOrderResult {
    orderId: string;
-@@ -79,6 +80,7 @@ export async function createCheckoutOrder(amount: string = '38.97'): Promise<Cre
-  * BUG-01: Contains blind retry loop without PayPal-Request-Id on network drops.
+@@ -110,6 +111,7 @@
+  * - BUG-03: Erroneously treats 422 INSTRUMENT_DECLINED as completed.
   */
  export async function captureCheckoutOrder(orderId: string, maxRetries: number = 2): Promise<CaptureResult> {
 +  const paypalRequestId = crypto.createHash('sha256').update(`capture-${orderId}`).digest('hex');
    let attempts = 0;
    let lastError: any = null;
    while (attempts <= maxRetries) {
-@@ -88,6 +90,7 @@ export async function captureCheckoutOrder(orderId: string, maxRetries: number =
+@@ -119,6 +121,7 @@
        const { result } = await ordersController.captureOrder({
          id: orderId,
          prefer: 'return=representation',
