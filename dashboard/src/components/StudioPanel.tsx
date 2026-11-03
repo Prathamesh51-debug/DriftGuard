@@ -1,9 +1,15 @@
 import { AgStudio, AgStudioProvider } from 'ag-studio-react'
-import { studioTheme } from 'ag-studio'
-import { useMemo } from 'react'
+import { AgStudioAiModule, AgStudioModuleRegistry, studioTheme } from 'ag-studio'
+import type { AgStudioApi } from 'ag-studio'
+import { useEffect, useMemo, useRef } from 'react'
 import type { Run } from '../types'
 import { RUN_FIELDS, toRunRows } from '../studioData'
 import { initialReport } from '../studioReport'
+import { createAnthropicAdapter } from '../studioAgent/anthropicAdapter'
+import { buildHarness } from '../studioAgent/harness'
+
+// The AI Assistant panel is an optional module: without this the panel is silently absent.
+AgStudioModuleRegistry.registerModules([AgStudioAiModule])
 
 const theme = studioTheme.withParams({
   backgroundColor: '#12161c',
@@ -18,14 +24,22 @@ const theme = studioTheme.withParams({
 })
 
 const LICENCE_KEY: string | undefined = import.meta.env.VITE_AG_STUDIO_KEY
+// The AI service holds the model key; the browser only ever talks to it.
+const AI_URL: string = import.meta.env.VITE_AI_URL ?? 'http://localhost:8001'
+const adapter = createAnthropicAdapter(AI_URL)
 
 export default function StudioPanel({ runs }: { runs: Run[] }) {
+  const runsRef = useRef(runs)
+  useEffect(() => {
+    runsRef.current = runs
+  }, [runs])
+  const ai = useMemo(() => ({ api }: { api: AgStudioApi }) => buildHarness(api, adapter, () => runsRef.current), [])
   const data = useMemo(() => ({ sources: [{ id: 'runs', name: 'Runs', description: 'One row per DriftGuard chaos run.', data: toRunRows(runs), fields: RUN_FIELDS.map((f) => ({ ...f })) }] }), [runs])
 
   return (
     <div className="studio-wrap">
       <AgStudioProvider licenseKey={LICENCE_KEY}>
-        <AgStudio style={{ height: '100%' }} theme={theme} data={data} initialState={initialReport} mode="edit" />
+        <AgStudio style={{ height: '100%' }} theme={theme} data={data} initialState={initialReport} mode="edit" ai={ai} />
       </AgStudioProvider>
     </div>
   )
