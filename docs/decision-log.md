@@ -159,3 +159,30 @@ Sandbox execution confirmed that retrying `OrdersController.captureOrder` withou
 5. **AI Common Adapter (`ai/common/`):**
    - Adopted the multi-provider LLM adapter into `ai/common/` (exporting Gemini, Groq, Anthropic with spend guard, fallback, and caching).
    - Re-exported all classes from `ai/fixer/` to maintain 100% backwards compatibility with Role C's tests.
+
+---
+
+## [2026-11-03] Role A Engine Core: Reconciler, Orchestrator & Database Layer
+- **Author:** Role A (Engine)
+- **Status:** APPROVED / IMPLEMENTED
+
+### Context
+Per `planner.md` (Part 2 & Part 6: Role Playbook A), the Engine needs:
+1. A ground-truth Reconciler comparing PayPal REST records with target app state.
+2. An Orchestrator coordinating the execution loop (Order -> Headless Buyer Driver -> Chaos Proxy -> Reconciler).
+3. A persistent Database layer with `SKIP LOCKED` task queue semantics.
+4. A FastAPI service (`engine/api/main.py`) replacing `mock_runner` on port 8000.
+
+### Implementation Summary
+1. **Reconciler (`engine/reconciler/`):**
+   - `PayPalClient`: Authenticates via OAuth and fetches unadulterated order details directly from `https://api-m.sandbox.paypal.com/v2/checkout/orders/{id}`.
+   - `reconcile_order()`: Harvests `PayPal-Request-Id` and hashes from `logs/proxy_traffic.jsonl`, queries target app `/_driftguard/state`, and computes `ObservedState`, `Evidence`, and deterministic `Result`.
+   - Adheres strictly to Rule 1 ("AI proposes, code decides"): evaluates `app_recorded_captures == captures`.
+2. **Database Layer (`engine/orchestrator/db.py`):**
+   - Implements persistent run storage with PostgreSQL primary backend.
+   - Includes `fetch_next_pending_run_skip_locked()` using `SELECT ... FOR UPDATE SKIP LOCKED` for crash-resilient worker concurrency.
+   - Includes zero-configuration SQLite fallback (`driftguard.db`) for lightweight testing when PostgreSQL is paused.
+3. **Orchestrator Runner (`engine/orchestrator/runner.py`):**
+   - Coordinates end-to-end execution: creates order, calls Playwright headless buyer approval (`ai.buyer_driver`), triggers capture through chaos proxy, and executes reconciliation.
+4. **API Service (`engine/api/main.py`):**
+   - Exposes `/health`, `/runs`, `/runs/{id}`, and `/runs/{id}/rerun` directly compatible with the React + AG Grid Dashboard.
