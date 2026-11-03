@@ -1,9 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { API_URL, launchRun, listRuns, rerunRun } from './api'
 import type { Run } from './types'
 import { RunsGrid } from './components/RunsGrid'
 import { EvidenceDrawer } from './components/EvidenceDrawer'
 import './App.css'
+
+const StudioPanel = lazy(() => import('./components/StudioPanel'))
+
+/** AG Studio is an add-on view: if it fails to load or render, the runs matrix must keep working. */
+class StudioBoundary extends Component<{ children: ReactNode }, { failed: string | null }> {
+  state = { failed: null as string | null }
+  static getDerivedStateFromError(e: unknown) {
+    return { failed: e instanceof Error ? e.message : 'unknown error' }
+  }
+  render() {
+    return this.state.failed ? (
+      <div className="notice notice-error" role="alert">
+        <strong>The Studio view could not load</strong>
+        <p>{this.state.failed}</p>
+        <p className="muted small">The runs table is unaffected.</p>
+      </div>
+    ) : (
+      this.props.children
+    )
+  }
+}
 
 export default function App() {
   const [runs, setRuns] = useState<Run[]>([])
@@ -13,6 +34,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [view, setView] = useState<'runs' | 'studio'>('runs')
   const wasOffline = useRef(false)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -71,6 +93,13 @@ export default function App() {
           <p className="muted">Chaos runs checked against PayPal&apos;s own records</p>
         </div>
         <div className="topbar-right">
+          <div className="tabs" role="tablist" aria-label="View">
+            {(['runs', 'studio'] as const).map((v) => (
+              <button key={v} role="tab" aria-selected={view === v} className={`tab ${view === v ? 'tab-on' : ''}`} onClick={() => setView(v)}>
+                {v === 'runs' ? 'Runs' : 'Studio'}
+              </button>
+            ))}
+          </div>
           <div className="tally" aria-label="Run totals">
             <span className="bad">{failing} red</span>
             <span className="good">{passing} green</span>
@@ -112,6 +141,13 @@ export default function App() {
       )}
 
       <main className="main">
+        {view === 'studio' ? (
+          <StudioBoundary>
+            <Suspense fallback={<p className="muted">Loading Studio…</p>}>
+              <StudioPanel runs={runs} />
+            </Suspense>
+          </StudioBoundary>
+        ) : (
         <RunsGrid
           runs={runs}
           selectedId={selectedId}
@@ -121,6 +157,7 @@ export default function App() {
             offline ? "Can't load runs while the engine is unreachable." : 'No runs yet. Click "Launch F1 run" to start one.'
           }
         />
+        )}
       </main>
 
       {selected && (
