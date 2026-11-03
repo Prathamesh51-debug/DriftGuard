@@ -8,7 +8,7 @@
   grid-template-columns: 1fr 400px;
 }
 .app.with-drawer .topbar,
-.app.with-drawer .banner,
+.app.with-drawer .banners,
 .app.with-drawer .main {
   grid-column: 1;
 }
@@ -19,7 +19,7 @@
 .topbar {
   grid-row: 1;
 }
-.banner {
+.banners {
   grid-row: 2;
 }
 .main {
@@ -68,6 +68,47 @@
   background: var(--amber-bg);
   color: var(--amber);
   border-bottom: 1px solid var(--line);
+}
+.banner-ok {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.banner-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--red-bg);
+  color: var(--red);
+}
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.notice {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+.notice p {
+  margin: 4px 0 0;
+}
+.notice-error {
+  background: var(--red-bg);
+  border-color: var(--red);
+  color: var(--red);
+}
+.notice-pass {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
 }
 
 .main {

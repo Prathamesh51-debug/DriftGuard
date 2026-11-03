@@ -1,7 +1,42 @@
 import { useEffect, useState } from 'react'
-import type { Run } from '../types'
-import { faultLabel, shortId } from '../format'
+import type { Result, Run } from '../types'
+import { elapsedSeconds, faultLabel, shortId } from '../format'
 import { VerdictChip } from './VerdictChip'
+
+const SLOW_RUN_SECONDS = 60
+
+function Waiting({ seconds }: { seconds: number }) {
+  return (
+    <div className="notice" role="status">
+      <strong>Waiting for the reconciler</strong>
+      <p>Reading PayPal&apos;s records for this run. {seconds}s so far.</p>
+      {seconds > SLOW_RUN_SECONDS && (
+        <p className="muted small">This is taking longer than usual. The engine may be stuck.</p>
+      )}
+    </div>
+  )
+}
+
+function Outcome({ result }: { result: Result }) {
+  if (result.verdict === 'ERROR') {
+    return (
+      <div className="notice notice-error" role="alert">
+        <strong>The test could not complete</strong>
+        <p>{result.error_message ?? 'The engine reported an error without details.'}</p>
+        <p className="muted small">No verdict was reached, so there is nothing to fix yet.</p>
+      </div>
+    )
+  }
+  if (result.verdict === 'PASS') {
+    return (
+      <div className="notice notice-pass">
+        <strong>No problem found</strong>
+        <p>{result.money_impact}</p>
+      </div>
+    )
+  }
+  return <p className="impact">{result.money_impact}</p>
+}
 
 function IdList({ title, ids }: { title: string; ids: string[] }) {
   const [copied, setCopied] = useState<string | null>(null)
@@ -64,12 +99,13 @@ export function EvidenceDrawer({
         <VerdictChip run={run} />
 
         {!result ? (
-          <p className="muted">Waiting for the reconciler to read PayPal&apos;s records…</p>
+          <Waiting seconds={elapsedSeconds(run.created_at)} />
         ) : (
           <>
-            <p className="impact">{result.money_impact}</p>
-            {result.error_message && <p className="bad">{result.error_message}</p>}
+            <Outcome result={result} />
 
+            {result.verdict !== 'ERROR' && (
+              <>
             <h3>Expected vs observed</h3>
             <table className="compare">
               <thead>
@@ -81,7 +117,7 @@ export function EvidenceDrawer({
               </thead>
               <tbody>
                 <tr>
-                  <td>Captures</td>
+                  <td>Captures (PayPal)</td>
                   <td className="mono">{scenario.expect.captures_per_purchase}</td>
                   <td
                     className={`mono ${result.observed.captures !== scenario.expect.captures_per_purchase ? 'bad' : ''}`}
@@ -89,6 +125,17 @@ export function EvidenceDrawer({
                     {result.observed.captures}
                   </td>
                 </tr>
+                {result.observed.app_recorded_captures != null && (
+                  <tr>
+                    <td>Captures (app&apos;s own records)</td>
+                    <td className="mono">{result.observed.captures}</td>
+                    <td
+                      className={`mono ${result.observed.app_recorded_captures !== result.observed.captures ? 'bad' : ''}`}
+                    >
+                      {result.observed.app_recorded_captures}
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <td>Amount ({scenario.expect.currency})</td>
                   <td className="mono">{wantAmount ?? '—'}</td>
@@ -99,6 +146,8 @@ export function EvidenceDrawer({
               </tbody>
             </table>
             <p className="muted small mono">rule: {result.rule}</p>
+              </>
+            )}
 
             <h3>Evidence from PayPal sandbox</h3>
             <IdList title="Order IDs" ids={result.evidence.paypal_order_ids} />

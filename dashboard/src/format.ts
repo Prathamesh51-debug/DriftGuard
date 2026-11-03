@@ -13,4 +13,8 @@ export function timeAgo(epochSeconds: number, now = Date.now()): string {
   return `${Math.floor(s / 3600)}h ago`
 }
 
+export function elapsedSeconds(epochSeconds: number, now = Date.now()): number {
+  return Math.max(0, Math.round(now / 1000 - epochSeconds))
+}
+
 export const shortId = (runId: string): string => runId.replace(/^run_/, '')

@@ -28,14 +28,22 @@ const theme = themeQuartz.withParams({
   spacing: 7,
 })
 
+function EmptyOverlay({ message }: { message: string }) {
+  return <span className="muted">{message}</span>
+}
+
 export function RunsGrid({
   runs,
   selectedId,
   onSelect,
+  loading,
+  emptyMessage,
 }: {
   runs: Run[]
   selectedId: string | null
   onSelect: (runId: string) => void
+  loading: boolean
+  emptyMessage: string
 }) {
   const gridRef = useRef<AgGridReact<Run>>(null)
 
@@ -78,17 +86,19 @@ export function RunsGrid({
         valueGetter: (p) => p.data?.result?.rule ?? '—',
       },
       {
-        headerName: 'Captures',
-        width: 120,
+        headerName: 'Captures (PayPal / app)',
+        width: 190,
         type: 'rightAligned',
         cellRenderer: (p: ICellRendererParams<Run>) => {
           const r = p.data?.result
           if (!p.data || !r) return <span className="muted">—</span>
-          const want = p.data.scenario.expect.captures_per_purchase
-          const bad = r.observed.captures !== want
+          const paypal = r.observed.captures
+          const app = r.observed.app_recorded_captures
+          // The drift is PayPal's count versus the app's own record; fall back to the expected count when the app's is not reported.
+          const compare = app ?? p.data.scenario.expect.captures_per_purchase
           return (
-            <span className={`mono ${bad ? 'bad' : ''}`}>
-              {r.observed.captures} / {want}
+            <span className={`mono ${paypal !== compare ? 'bad' : ''}`}>
+              {paypal} / {app ?? '?'}
             </span>
           )
         },
@@ -119,7 +129,9 @@ export function RunsGrid({
         getRowId={(p) => p.data.run_id}
         onRowClicked={(e) => e.data && onSelect(e.data.run_id)}
         getRowClass={(p) => (p.data?.run_id === selectedId ? 'row-selected' : '')}
-        noRowsOverlayComponent={() => <span className="muted">No runs yet. Launch one.</span>}
+        loading={loading}
+        noRowsOverlayComponent={EmptyOverlay}
+        noRowsOverlayComponentParams={{ message: emptyMessage }}
         suppressCellFocus
       />
     </div>
