@@ -4,6 +4,7 @@ Planner Ref: Role Playbook A (A4 - API & Deploy).
 Replaces mock_runner on port 8000 and serves real execution runs backed by database persistence.
 """
 
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -13,37 +14,66 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from contracts import Result, Scenario
+from contracts import Result, Scenario, Verdict, ObservedState, Evidence, FaultType
 from engine.orchestrator import db, run_scenario
 
 FIXTURES = Path(__file__).resolve().parents[2] / "contracts" / "fixtures"
 DEFAULT_SCENARIO = Scenario.model_validate_json(
     (FIXTURES / "f1_scenario.json").read_text(encoding="utf-8")
 )
-INITIAL_RESULT_FAIL = Result.model_validate_json(
-    (FIXTURES / "f1_result_fail.json").read_text(encoding="utf-8")
-)
+
+# Extra CORS origins (e.g. Render deploy URL) via env var.
+# Format: comma-separated, e.g. "https://driftguard.onrender.com,https://staging.example.com"
+_extra_origins = [
+    o.strip() for o in os.getenv("DRIFTGUARD_CORS_ORIGINS", "").split(",") if o.strip()
+]
+CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"] + _extra_origins
 
 
 class Run(BaseModel):
     run_id: str
-    status: str  # "running" | "complete"
+    status: str  # "running" | "complete" | "error"
     created_at: float
     scenario: Scenario
     result: Optional[Result] = None
     rerun_of: Optional[str] = None
 
 
+class LaunchRunRequest(BaseModel):
+    fault: Optional[str] = None  # FaultType value, e.g. "F1_LOST_CAPTURE_RESPONSE"
+
+
+def _make_error_result(scenario: Scenario, exc: Exception) -> Result:
+    """Build a well-formed ERROR Result for any unhandled engine exception."""
+    return Result(
+        scenario_id=scenario.scenario_id,
+        verdict=Verdict.ERROR,
+        rule="engine_run_completed",
+        observed=ObservedState(captures=0, amount_captured="0.00"),
+        evidence=Evidence(),
+        money_impact="error: engine failed before reconciliation could finish",
+        error_message=str(exc),
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables on startup
     db.init_db()
-    # If fresh database, seed one initial run so dashboard is populated on first launch
-    existing = db.list_runs()
-    if len(existing) == 0:
-        seed_id = f"run_{uuid.uuid4().hex[:8]}"
-        seed_run = db.create_run(seed_id, DEFAULT_SCENARIO.model_dump())
-        db.update_run_result(seed_id, "complete", INITIAL_RESULT_FAIL.model_dump())
+    # Mark any run left "running" from a previous crash as "error"
+    # so the dashboard never shows a permanently-stuck RUNNING chip.
+    for r in db.list_runs():
+        if r["status"] == "running":
+            error_result = Result(
+                scenario_id=r["scenario"].get("scenario_id", "unknown"),
+                verdict=Verdict.ERROR,
+                rule="engine_run_completed",
+                observed=ObservedState(captures=0, amount_captured="0.00"),
+                evidence=Evidence(),
+                money_impact="error: engine restarted during run",
+                error_message="Engine process was restarted while this run was in progress.",
+            )
+            db.update_run_result(r["run_id"], "error", error_result.model_dump())
     yield
 
 
@@ -51,19 +81,20 @@ app = FastAPI(title="DriftGuard Engine API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 def _execute_run(run_id: str, scenario: Scenario):
-    """Background task to run orchestrator and save real Result into database."""
+    """Background task: run orchestrator and persist the Result (pass, fail, or error)."""
     try:
         result = run_scenario(scenario)
         db.update_run_result(run_id, "complete", result.model_dump())
     except Exception as e:
-        db.update_run_result(run_id, "complete", None)
+        error_result = _make_error_result(scenario, e)
+        db.update_run_result(run_id, "error", error_result.model_dump())
 
 
 @app.get("/health")
@@ -93,18 +124,38 @@ def list_runs() -> List[Run]:
 
 
 @app.post("/runs", response_model=Run, status_code=201)
-def launch_run(background_tasks: BackgroundTasks) -> Run:
-    """Launch a real chaos test run on the target shop."""
+def launch_run(body: LaunchRunRequest = LaunchRunRequest(), background_tasks: BackgroundTasks = BackgroundTasks()) -> Run:
+    """Launch a real chaos test run. Optional body: {"fault": "F1_LOST_CAPTURE_RESPONSE"}"""
+    # Resolve which scenario to run
+    if body.fault is not None:
+        valid_faults = {f.value for f in FaultType}
+        if body.fault not in valid_faults:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown fault '{body.fault}'. Valid values: {sorted(valid_faults)}"
+            )
+        # Load matching fixture by fault key prefix (e.g. "F2_SLOW_PAYPAL" -> "f2_scenario.json")
+        fault_prefix = body.fault.split("_")[0].lower()  # "f1", "f2", etc.
+        fixture_path = FIXTURES / f"{fault_prefix}_scenario.json"
+        if not fixture_path.exists():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Fault '{body.fault}' has no fixture yet. Available: F1_LOST_CAPTURE_RESPONSE"
+            )
+        scenario = Scenario.model_validate_json(fixture_path.read_text(encoding="utf-8"))
+    else:
+        scenario = DEFAULT_SCENARIO
+
     run_id = f"run_{uuid.uuid4().hex[:8]}"
-    db_run = db.create_run(run_id, DEFAULT_SCENARIO.model_dump())
-    
-    background_tasks.add_task(_execute_run, run_id, DEFAULT_SCENARIO)
-    
+    db_run = db.create_run(run_id, scenario.model_dump())
+
+    background_tasks.add_task(_execute_run, run_id, scenario)
+
     return Run(
         run_id=db_run["run_id"],
         status=db_run["status"],
         created_at=db_run["created_at"],
-        scenario=DEFAULT_SCENARIO,
+        scenario=scenario,
         result=None
     )
 
@@ -126,17 +177,22 @@ def get_run(run_id: str) -> Run:
 
 @app.post("/runs/{run_id}/rerun", response_model=Run, status_code=201)
 def rerun(run_id: str, background_tasks: BackgroundTasks) -> Run:
-    """Trigger a rerun for a scenario."""
+    """Trigger a rerun for a completed or errored scenario. Returns 409 if still running."""
     parent = db.get_run(run_id)
     if not parent:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-    
+    if parent["status"] == "running":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run {run_id} is still running; wait for it to finish before rerunning."
+        )
+
     new_run_id = f"run_{uuid.uuid4().hex[:8]}"
     scenario = Scenario.model_validate(parent["scenario"])
     db_run = db.create_run(new_run_id, scenario.model_dump(), rerun_of=run_id)
-    
+
     background_tasks.add_task(_execute_run, new_run_id, scenario)
-    
+
     return Run(
         run_id=db_run["run_id"],
         status=db_run["status"],
