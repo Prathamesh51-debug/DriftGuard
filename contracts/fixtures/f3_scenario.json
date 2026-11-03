@@ -1,0 +1,20 @@
+{
+  "scenario_id": "f3-capture-declined-001",
+  "fault": "F3_FORCED_DECLINE",
+  "description": "Mock INSTRUMENT_DECLINED 422 response on POST .../capture to verify order is kept unpaid and not marked completed",
+  "target_call": {
+    "file": "src/checkout.ts",
+    "line": 119,
+    "method": "OrdersController.captureOrder"
+  },
+  "inject": {
+    "on": "POST .../capture",
+    "action": "mock_response",
+    "mock_header": "{\"mock_application_codes\": \"INSTRUMENT_DECLINED\"}"
+  },
+  "expect": {
+    "captures_per_purchase": 0,
+    "amount": "0.00",
+    "currency": "USD"
+  }
+}

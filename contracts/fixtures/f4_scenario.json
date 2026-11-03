@@ -1,0 +1,20 @@
+{
+  "scenario_id": "f4-duplicate-invoice-001",
+  "fault": "F4_DUPLICATE_INVOICE",
+  "description": "Inject duplicate invoice ID collision to test deterministic cart hash invoice derivation",
+  "target_call": {
+    "file": "src/checkout.ts",
+    "line": 48,
+    "method": "OrdersController.createOrder"
+  },
+  "inject": {
+    "on": "POST .../v2/checkout/orders",
+    "action": "mock_response",
+    "mock_header": "{\"mock_application_codes\": \"DUPLICATE_INVOICE_ID\"}"
+  },
+  "expect": {
+    "captures_per_purchase": 1,
+    "amount": "38.97",
+    "currency": "USD"
+  }
+}

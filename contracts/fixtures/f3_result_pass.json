@@ -1,0 +1,26 @@
+{
+  "scenario_id": "f3-capture-declined-001",
+  "verdict": "PASS",
+  "rule": "app_recorded_captures == captures",
+  "observed": {
+    "captures": 0,
+    "amount_captured": "0.00",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 0
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "4DE612984B761204X"
+    ],
+    "paypal_capture_ids": [],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "req_03f3decline001"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "clean: declined order safely kept unpaid with 0 captures recorded in app",
+  "error_message": null
+}
+

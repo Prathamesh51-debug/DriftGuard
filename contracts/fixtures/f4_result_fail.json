@@ -1,0 +1,26 @@
+{
+  "scenario_id": "f4-duplicate-invoice-001",
+  "verdict": "FAIL",
+  "rule": "app_recorded_captures == captures",
+  "observed": {
+    "captures": 0,
+    "amount_captured": "0.00",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 0
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "7KL918234C541290Y"
+    ],
+    "paypal_capture_ids": [],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "req_04f4invoice001"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "invoice collision: random invoice ID broke deterministic ledger reconciliation",
+  "error_message": null
+}
+

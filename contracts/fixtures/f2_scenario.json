@@ -1,0 +1,20 @@
+{
+  "scenario_id": "f2-order-timeout-001",
+  "fault": "F2_SLOW_PAYPAL",
+  "description": "Inject 6000ms delay on POST /v2/checkout/orders to trigger client timeout and un-idempotent retry",
+  "target_call": {
+    "file": "src/checkout.ts",
+    "line": 48,
+    "method": "OrdersController.createOrder"
+  },
+  "inject": {
+    "on": "POST .../v2/checkout/orders",
+    "action": "delay",
+    "delay_ms": 6000
+  },
+  "expect": {
+    "captures_per_purchase": 1,
+    "amount": "38.97",
+    "currency": "USD"
+  }
+}

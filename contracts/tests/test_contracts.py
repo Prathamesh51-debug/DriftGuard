@@ -104,3 +104,23 @@ def test_invalid_line_number_rejected():
     with pytest.raises(ValidationError):
         TargetCall(file="index.ts", line=0)
 
+
+def test_phase_2_breadth_fixtures():
+    """Validates that all Phase 2 fixtures (F2, F3, F4) conform strictly to contracts."""
+    for fault_key in ["f2", "f3", "f4"]:
+        scenario_file = FIXTURES_DIR / f"{fault_key}_scenario.json"
+        assert scenario_file.exists(), f"Missing {scenario_file}"
+        scenario = Scenario.model_validate_json(scenario_file.read_text(encoding="utf-8"))
+        assert scenario.scenario_id.startswith(fault_key)
+
+        fail_file = FIXTURES_DIR / f"{fault_key}_result_fail.json"
+        assert fail_file.exists(), f"Missing {fail_file}"
+        fail_res = Result.model_validate_json(fail_file.read_text(encoding="utf-8"))
+        assert fail_res.verdict == Verdict.FAIL
+
+        pass_file = FIXTURES_DIR / f"{fault_key}_result_pass.json"
+        assert pass_file.exists(), f"Missing {pass_file}"
+        pass_res = Result.model_validate_json(pass_file.read_text(encoding="utf-8"))
+        assert pass_res.verdict == Verdict.PASS
+
+

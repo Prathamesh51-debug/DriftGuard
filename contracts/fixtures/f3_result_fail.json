@@ -1,0 +1,26 @@
+{
+  "scenario_id": "f3-capture-declined-001",
+  "verdict": "FAIL",
+  "rule": "app_recorded_captures == captures",
+  "observed": {
+    "captures": 0,
+    "amount_captured": "0.00",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "4DE612984B761204X"
+    ],
+    "paypal_capture_ids": [],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "req_03f3decline001"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "state drift detected: expected 0 captures, got 0 in PayPal vs 1 in app (false fulfillment on INSTRUMENT_DECLINED)",
+  "error_message": null
+}
+
