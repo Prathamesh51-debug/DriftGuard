@@ -16,7 +16,7 @@ down:
 	docker compose down
 
 demo:
-	cd targets/demo-shop && npx tsx src/server.ts
+	cd targets/demo-shop && npx tsx watch src/server.ts
 
 api:
 	uvicorn engine.api.main:app --port 8000 --reload
