@@ -46,6 +46,12 @@ def template_explanation(result: Result, scenario: Scenario, attempts: int = 0, 
     elif result.verdict == Verdict.ERROR:
         headline = "Test could not complete"
         what = result.error_message or "The test hit an error before PayPal's records could be checked."
+    elif obs.app_recorded_captures is not None and obs.app_recorded_captures != obs.captures:
+        headline = "PayPal took the payment but the app has no record of it"
+        what = (
+            f"PayPal's records show {obs.captures} capture(s) totalling {obs.amount_captured} {expect.currency}, "
+            f"but the app's own records show {obs.app_recorded_captures}. Rule broken: {result.rule}."
+        )
     else:
         headline = "Payment records do not match"
         what = (

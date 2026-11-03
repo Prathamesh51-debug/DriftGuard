@@ -101,3 +101,20 @@ def test_passing_result_needs_no_model(scenario):
     out = explain(passing, scenario, llm)
     assert out.source == "template" and llm.calls == []
     assert verify_text([out.headline, out.what_happened, out.impact], passing, scenario) == []
+
+def test_drift_between_paypal_and_the_app_reaches_the_prompt_and_the_template(failing, scenario):
+    """F1 ground truth: PayPal captured once but the app recorded none."""
+    from ai.explainer.prompt import build_user_prompt
+
+    assert failing.observed.app_recorded_captures == 0
+    assert "App's own records: 0 capture(s)" in build_user_prompt(failing, scenario)
+
+    out = template_explanation(failing, scenario)
+    assert "app has no record" in out.headline and "app's own records show 0" in out.what_happened
+    assert verify_text([out.headline, out.what_happened, out.impact], failing, scenario) == []
+
+
+def test_text_about_the_app_record_is_checked_like_any_other_figure(failing, scenario):
+    good = "PayPal shows 1 capture of 38.97 USD, but the app recorded 0 captures."
+    assert verify_text([good], failing, scenario) == []
+    assert verify_text(["The app recorded 3 captures."], failing, scenario) == ["number 3 is not in the result"]

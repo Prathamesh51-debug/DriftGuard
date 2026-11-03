@@ -13,6 +13,7 @@ Rules:
 - Use only numbers and IDs that appear in the facts. Do not invent, round or convert any figure.
 - Do not mention HTTP status codes, retries, SDK names or code details unless the facts state them.
 - Say what PayPal's records show compared with what was expected. Do not guess at causes beyond the facts.
+- If the facts give the app's own records and they differ from PayPal's, say that PayPal took the payment but the app has no matching record.
 - No markdown and no bullet points.
 """
 
@@ -25,6 +26,7 @@ def build_user_prompt(result: Result, scenario: Scenario, previous_error: Option
         f"Verdict: {result.verdict.value}",
         f"Rule: {result.rule}",
         f"PayPal captures: {obs.captures}, total captured: {obs.amount_captured} {scenario.expect.currency}",
+        *([f"App's own records: {obs.app_recorded_captures} capture(s)"] if obs.app_recorded_captures is not None else []),
         f"Expected: {scenario.expect.captures_per_purchase} capture(s), amount {scenario.expect.amount}",
         f"Orders created: {obs.orders_created}, refunds issued: {obs.refunds_issued}",
         f"Money impact (computed by code): {result.money_impact}",
