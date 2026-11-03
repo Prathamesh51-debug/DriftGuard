@@ -30,14 +30,14 @@ app.get('/health', (_req: Request, res: Response) => {
  * DriftGuard State Inspection Endpoint
  * Queried by the Reconciler to verify internal application drift against PayPal.
  */
-app.get('/_driftguard/state', (_req: Request, res: Response) => {
+app.get(['/_driftguard/state', '/driftguard/state'], (_req: Request, res: Response) => {
   res.json(shopState.getState());
 });
 
 /**
  * Reset internal state for test resets
  */
-app.post('/_driftguard/reset', (_req: Request, res: Response) => {
+app.post(['/_driftguard/reset', '/driftguard/reset'], (_req: Request, res: Response) => {
   shopState.reset();
   res.json({ status: 'reset', state: shopState.getState() });
 });

@@ -9,7 +9,7 @@ bugs:
     fault: "F1_LOST_CAPTURE_RESPONSE"
     name: "Blind retry on capture timeout without PayPal-Request-Id"
     file: "src/checkout.ts"
-    target_line: 88
+    target_line: 125
     status: "active"
     trigger: "HTTP 504 Gateway Timeout or dropped connection after upstream 201"
     safe_behavior: "Pass deterministic PayPal-Request-Id header; query order status before retry"
@@ -19,27 +19,31 @@ bugs:
     fault: "F2_SLOW_PAYPAL"
     name: "Blind retry on createOrder timeout"
     file: "src/checkout.ts"
-    target_line: 37
-    status: "dormant"
+    target_line: 52
+    status: "active"
     trigger: "Delay > 5000ms on POST /v2/checkout/orders"
     safe_behavior: "Send deterministic PayPal-Request-Id on order creation"
+    failure_mode: "Duplicate orders: Retrying createOrder on timeout without idempotency key creates multiple unlinked orders in PayPal"
 
   - id: "BUG-03"
     fault: "F3_FORCED_DECLINE"
     name: "Unhandled 422 INSTRUMENT_DECLINED marks order complete"
     file: "src/checkout.ts"
-    target_line: 110
-    status: "dormant"
+    target_line: 147
+    status: "active"
     trigger: "PayPal-Mock-Response: {'mock_application_codes': 'INSTRUMENT_DECLINED'}"
     safe_behavior: "Keep order unpaid, surface INSTRUMENT_DECLINED to buyer"
+    failure_mode: "False fulfillment / state drift: PayPal returns 422 INSTRUMENT_DECLINED ($0 captured), but application erroneously records order as COMPLETED (1 capture)"
 
   - id: "BUG-04"
     fault: "F4_DUPLICATE_INVOICE"
     name: "Non-deterministic invoice_id randomly generated"
     file: "src/checkout.ts"
-    status: "dormant"
+    target_line: 60
+    status: "active"
     trigger: "Duplicate invoice error"
     safe_behavior: "Derive deterministic invoice_id from cart SHA-256 hash"
+    failure_mode: "Invoice collision: Random invoice ID causes collision or breaks reconciliation with cart items"
 
   - id: "BUG-05"
     fault: "F5_MONEY_MATH_TRAP"
