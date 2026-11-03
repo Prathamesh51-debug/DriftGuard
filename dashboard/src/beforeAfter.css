@@ -139,3 +139,17 @@
     grid-template-columns: 1fr;
   }
 }
+
+.err-detail {
+  margin-top: 6px;
+}
+.err-detail summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.err-detail p {
+  margin: 6px 0 0;
+  word-break: break-word;
+  color: var(--muted);
+}

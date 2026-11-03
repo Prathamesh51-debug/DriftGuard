@@ -3,7 +3,7 @@ import scenario from '../../contracts/fixtures/f1_scenario.json'
 import fail from '../../contracts/fixtures/f1_result_fail.json'
 import pass from '../../contracts/fixtures/f1_result_pass.json'
 import type { Run } from './types'
-import { classifyDiffLine, compareOutcome, originalOf, rerunOf } from './beforeAfter'
+import { classifyDiffLine, compareOutcome, describeError, originalOf, rerunOf } from './beforeAfter'
 
 const run = (id: string, result: unknown, rerun_of: string | null = null): Run =>
   ({ run_id: id, status: result ? 'complete' : 'running', created_at: 1, scenario, result, rerun_of }) as unknown as Run
@@ -53,5 +53,16 @@ describe('classifyDiffLine', () => {
     expect(classifyDiffLine('--- a/src/checkout.ts')).toBe('meta')
     expect(classifyDiffLine('diff --git a/x b/x')).toBe('meta')
     expect(classifyDiffLine(' unchanged')).toBe('ctx')
+  })
+})
+
+describe('describeError', () => {
+  it('explains an unreachable shop in plain words and keeps the raw text as detail', () => {
+    const e = describeError('target_reachable', 'HTTPConnectionPool(host=localhost, port=3001): Max retries exceeded')
+    expect(e.headline).toContain("shop didn't answer")
+    expect(e.detail).toContain('HTTPConnectionPool')
+  })
+  it('has a generic headline for other errors and tolerates a missing message', () => {
+    expect(describeError('engine_run_completed', null)).toEqual({ headline: 'The engine could not finish this run.', detail: null })
   })
 })

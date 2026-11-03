@@ -32,3 +32,11 @@ export function classifyDiffLine(line: string): DiffLineKind {
   if (line.startsWith('-')) return 'del'
   return 'ctx'
 }
+
+/** A plain-words account of an ERROR result, with the engine's own text kept as detail. */
+export function describeError(rule: string, message: string | null): { headline: string; detail: string | null } {
+  if (rule === 'target_reachable') {
+    return { headline: "The demo shop didn't answer, so the test could not run. Start the shop and run it again.", detail: message }
+  }
+  return { headline: 'The engine could not finish this run.', detail: message }
+}

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import type { FixProposal, Run } from '../types'
-import { compareOutcome, type CompareOutcome } from '../beforeAfter'
+import { compareOutcome, describeError, type CompareOutcome } from '../beforeAfter'
 import { elapsedSeconds, faultLabel, shortId } from '../format'
 import { VerdictChip } from './VerdictChip'
 import { DiffView } from './FixPanel'
@@ -21,6 +21,12 @@ function Side({ title, run, tone }: { title: string; run: Run | undefined; tone:
           <strong>Re-running the same scenario…</strong>
           <p className="muted small">{run ? `${elapsedSeconds(run.created_at)}s so far.` : 'Starting.'}</p>
         </div>
+      ) : result.verdict === 'ERROR' ? (
+        <>
+          <p className="muted small mono">Run {shortId(run.run_id)}</p>
+          <p className="impact">{describeError(result.rule, result.error_message).headline}</p>
+          <p className="muted small">No numbers are shown because PayPal was never checked for this run.</p>
+        </>
       ) : (
         <>
           <p className="muted small mono">Run {shortId(run.run_id)}</p>
@@ -42,7 +48,7 @@ function Side({ title, run, tone }: { title: string; run: Run | undefined; tone:
               </dd>
             </div>
           </dl>
-          <p className="impact">{result.verdict === 'ERROR' ? (result.error_message ?? 'The run could not finish.') : result.money_impact}</p>
+          <p className="impact">{result.money_impact}</p>
         </>
       )}
     </section>

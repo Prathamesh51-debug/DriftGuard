@@ -3,6 +3,7 @@ import type { FixState, Result, Run } from '../types'
 import { elapsedSeconds, faultLabel, shortId } from '../format'
 import { VerdictChip } from './VerdictChip'
 import { FixPanel } from './FixPanel'
+import { describeError } from '../beforeAfter'
 
 const SLOW_RUN_SECONDS = 60
 
@@ -20,10 +21,17 @@ function Waiting({ seconds }: { seconds: number }) {
 
 function Outcome({ result }: { result: Result }) {
   if (result.verdict === 'ERROR') {
+    const err = describeError(result.rule, result.error_message)
     return (
       <div className="notice notice-error" role="alert">
         <strong>The test could not complete</strong>
-        <p>{result.error_message ?? 'The engine reported an error without details.'}</p>
+        <p>{err.headline}</p>
+        {err.detail && (
+          <details className="err-detail">
+            <summary>Technical details</summary>
+            <p className="mono small">{err.detail}</p>
+          </details>
+        )}
         <p className="muted small">No verdict was reached, so there is nothing to fix yet.</p>
       </div>
     )
