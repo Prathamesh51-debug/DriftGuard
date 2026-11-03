@@ -3,7 +3,7 @@ from pathlib import Path
 from evals.fixer.compare import score_against_known
 
 ROOT = Path(__file__).resolve().parents[2]
-GOOD = (ROOT / "ai" / "fixer" / "tests" / "bug01_fix.diff").read_text(encoding="utf-8")
+GOOD = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
 
 
 def test_identical_patch_scores_full():

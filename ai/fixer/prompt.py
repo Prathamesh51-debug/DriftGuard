@@ -27,7 +27,9 @@ SDK_NOTES = {
         "ordersController.captureOrder({ id, prefer, paypalRequestId }) accepts paypalRequestId, which is "
         "sent as the PayPal-Request-Id header. PayPal treats repeat calls with the same id as one request, so "
         "a retry cannot capture twice. Derive the id from the order id (for example a sha256 of "
-        "`capture-${orderId}`) so every retry of the same capture sends the same value."
+        "`capture-${orderId}`) so every retry of the same capture sends the same value. Without it, a retry after a "
+        "lost response gets 422 ORDER_ALREADY_CAPTURED even though the buyer was charged, and the app wrongly marks "
+        "the order failed; with it, PayPal returns the original capture result (HTTP 200) so the app can record it."
     ),
 }
 
@@ -49,6 +51,8 @@ def build_user_prompt(
         f"Rule broken: {result.rule}\n"
         f"PayPal's records: {obs.captures} captures, {obs.amount_captured} {scenario.expect.currency} captured; "
         f"expected {scenario.expect.captures_per_purchase} capture(s) of {scenario.expect.amount}.\n"
+        + (f"The app's own records show {obs.app_recorded_captures} capture(s).\n" if obs.app_recorded_captures is not None else "")
+        +
         f"Impact: {result.money_impact}",
         f"## Bug entry\n{bug.id}: {bug.name}\nFile: {bug.file}, near line {bug.target_line}\n"
         f"Failure mode: {bug.failure_mode}\nSafe behaviour: {bug.safe_behavior}",

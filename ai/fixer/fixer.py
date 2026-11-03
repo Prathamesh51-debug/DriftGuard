@@ -8,13 +8,13 @@ that the fix works still comes from re-running the chaos scenario.
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pydantic import BaseModel
 
 from contracts import Result, Scenario, Verdict
 
-from .bugs import BugEntry
+from .bugs import BugEntry, known_fix_candidates
 from .llm import LLMClient, LLMError, extract_json
 from .patcher import check_diff, normalize_diff
 from .prompt import SYSTEM_PROMPT, build_user_prompt
@@ -49,12 +49,14 @@ def propose_fix(
     shop_dir: Path,
     llm: LLMClient,
     *,
-    known_fix: Optional[Path] = None,
+    known_fixes: Optional[Sequence[Path]] = None,
     max_attempts: int = MAX_ATTEMPTS,
 ) -> FixProposal:
     """Ask the model for a fix, up to `max_attempts` times, feeding each rejection back to it.
 
-    If every attempt is rejected and `known_fix` is given, fall back to that patch (if it applies).
+    If every attempt is rejected, fall back to the first curated fix that applies. `known_fixes`
+    defaults to the ones on disk for this bug (the team's in targets/known-fixes, then the copy
+    bundled here); pass [] to measure the model alone.
     """
     if result.verdict != Verdict.FAIL:
         raise ValueError(f"nothing to fix: verdict is {result.verdict.value}")
@@ -84,15 +86,16 @@ def propose_fix(
             )
         error = f"The diff was rejected: {check.error}"
 
-    if known_fix is not None and Path(known_fix).is_file():
-        diff = normalize_diff(Path(known_fix).read_text(encoding="utf-8"))
+    candidates = known_fix_candidates(bug.id) if known_fixes is None else list(known_fixes)
+    for path in candidates:
+        diff = normalize_diff(Path(path).read_text(encoding="utf-8"))
         check = check_diff(diff, shop_dir, allowed_file=bug.file)
         if check.ok:
             return FixProposal(
                 bug_id=bug.id, applies=True, source="known_fix", diff=diff,
-                explanation="Model attempts failed; used the curated patch.",
+                explanation=f"Model attempts failed; used the curated fix {Path(path).name}.",
                 files=check.files, lines_changed=check.lines_changed, attempts=max_attempts,
             )
-        error = f"{error} Known fix also failed: {check.error}"
+        error = f"{error} Curated fix {Path(path).name} does not apply: {check.error}"
 
     return FixProposal(bug_id=bug.id, applies=False, source="llm", attempts=max_attempts, error=error)

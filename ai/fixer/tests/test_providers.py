@@ -1,6 +1,7 @@
 """Provider tests: failover, spend guard, cache and reply parsing. Nothing here touches the network."""
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +11,9 @@ from ai.fixer.llm import LLMError, ScriptedLLM
 from ai.fixer.providers import (
     AnthropicClient, CachedLLM, FallbackLLM, GeminiClient, GroqClient, SpendGuard, cost_usd, llm_from_env,
 )
+
+
+KNOWN_FIX = Path(__file__).resolve().parents[1] / "known_fixes" / "BUG-01.diff"
 
 
 class Down:
@@ -149,8 +153,6 @@ def test_llm_from_env_errors_when_no_keys(monkeypatch):
 
 def test_fixer_and_explainer_fall_back_when_every_provider_is_down():
     """No model at all: the Fixer uses the curated patch and the Explainer uses the template."""
-    from pathlib import Path
-
     from ai.explainer import explain
     from ai.fixer import find_bug, load_bugs, propose_fix
     from contracts import Result, Scenario
@@ -161,7 +163,7 @@ def test_fixer_and_explainer_fall_back_when_every_provider_is_down():
     dead = FallbackLLM([Down(), Down()])
 
     fix = propose_fix(failing, scenario, find_bug(scenario, load_bugs()), root / "targets/demo-shop", dead,
-                      known_fix=Path(__file__).parent / "bug01_fix.diff")
+                      known_fixes=[KNOWN_FIX])
     assert fix.applies and fix.source == "known_fix"
 
     out = explain(failing, scenario, dead)
@@ -189,8 +191,6 @@ def test_importing_providers_does_not_need_the_anthropic_sdk():
 
 
 def test_offline_mode_uses_curated_patch_and_template():
-    from pathlib import Path
-
     from ai.explainer import explain
     from ai.fixer import find_bug, load_bugs, propose_fix
     from contracts import Result, Scenario
@@ -201,15 +201,13 @@ def test_offline_mode_uses_curated_patch_and_template():
     offline = llm_from_env("none")
 
     fix = propose_fix(failing, scenario, find_bug(scenario, load_bugs()), root / "targets/demo-shop", offline,
-                      known_fix=Path(__file__).parent / "bug01_fix.diff")
+                      known_fixes=[KNOWN_FIX])
     assert fix.applies and fix.source == "known_fix" and fix.provider is None
     out = explain(failing, scenario, offline)
     assert out.source == "template" and out.provider is None
 
 
 def test_outputs_record_which_provider_answered():
-    from pathlib import Path
-
     from ai.explainer import explain
     from ai.fixer import find_bug, load_bugs, propose_fix
     from contracts import Result, Scenario
@@ -217,7 +215,7 @@ def test_outputs_record_which_provider_answered():
     root = Path(__file__).resolve().parents[3]
     scenario = Scenario.model_validate_json((root / "contracts/fixtures/f1_scenario.json").read_text(encoding="utf-8"))
     failing = Result.model_validate_json((root / "contracts/fixtures/f1_result_fail.json").read_text(encoding="utf-8"))
-    good_diff = (Path(__file__).parent / "bug01_fix.diff").read_text(encoding="utf-8")
+    good_diff = KNOWN_FIX.read_text(encoding="utf-8")
     chain = FallbackLLM([Down(), Up(json.dumps({"diff": good_diff, "explanation": "ok"}))])
 
     fix = propose_fix(failing, scenario, find_bug(scenario, load_bugs()), root / "targets/demo-shop", chain)

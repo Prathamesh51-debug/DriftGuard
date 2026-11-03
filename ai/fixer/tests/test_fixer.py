@@ -11,7 +11,8 @@ from contracts import Result, Scenario
 ROOT = Path(__file__).resolve().parents[3]
 SHOP = ROOT / "targets" / "demo-shop"
 FIXTURES = ROOT / "contracts" / "fixtures"
-GOOD_DIFF = (Path(__file__).parent / "bug01_fix.diff").read_text(encoding="utf-8")
+KNOWN_FIX = ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff"
+GOOD_DIFF = KNOWN_FIX.read_text(encoding="utf-8")
 
 
 @pytest.fixture
@@ -81,7 +82,7 @@ def test_bad_json_is_retried(failing, scenario, bug):
 
 def test_diff_that_does_not_apply_is_rejected(failing, scenario, bug):
     stale = GOOD_DIFF.replace("import { shopState } from './state';", "import { somethingElse } from './x';")
-    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM([reply(stale)] * 3))
+    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM([reply(stale)] * 3), known_fixes=[])
     assert not proposal.applies and "rejected" in proposal.error
 
 
@@ -92,13 +93,12 @@ def test_oversized_diff_is_rejected():
 
 def test_falls_back_to_known_fix_after_three_failures(failing, scenario, bug):
     llm = ScriptedLLM(["nope", "still nope", "no"])
-    known = Path(__file__).parent / "bug01_fix.diff"
-    proposal = propose_fix(failing, scenario, bug, SHOP, llm, known_fix=known)
+    proposal = propose_fix(failing, scenario, bug, SHOP, llm, known_fixes=[KNOWN_FIX])
     assert proposal.applies and proposal.source == "known_fix" and len(llm.calls) == 3
 
 
 def test_gives_up_cleanly_when_nothing_applies(failing, scenario, bug):
-    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM(["nope"] * 3))
+    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM(["nope"] * 3), known_fixes=[])
     assert not proposal.applies and proposal.diff is None and proposal.attempts == 3
 
 
@@ -106,3 +106,44 @@ def test_passing_result_has_nothing_to_fix(scenario, bug):
     passing = Result.model_validate_json((FIXTURES / "f1_result_pass.json").read_text(encoding="utf-8"))
     with pytest.raises(ValueError, match="nothing to fix"):
         propose_fix(passing, scenario, bug, SHOP, ScriptedLLM([]))
+
+
+def test_default_fallback_skips_a_broken_curated_patch_and_uses_the_next(failing, scenario, bug, tmp_path, monkeypatch):
+    from ai.fixer import bugs
+
+    team, bundled = tmp_path / "team", tmp_path / "bundled"
+    team.mkdir(), bundled.mkdir()
+    (team / "BUG-01.patch").write_text("--- a/src/checkout.ts\n+++ b/src/checkout.ts\n@@ -1,3 +1,4 @@\n not the real context\n+x\n", encoding="utf-8")
+    (bundled / "BUG-01.diff").write_text(GOOD_DIFF, encoding="utf-8")
+    monkeypatch.setattr(bugs, "KNOWN_FIX_DIRS", [team, bundled])
+
+    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM(["nope"] * 3))  # known_fixes left at its default
+    assert proposal.applies and proposal.source == "known_fix"
+    assert "BUG-01.diff" in proposal.explanation
+
+
+def test_the_teams_curated_patch_is_preferred_once_it_applies(failing, scenario, bug, tmp_path, monkeypatch):
+    from ai.fixer import bugs
+
+    team, bundled = tmp_path / "team", tmp_path / "bundled"
+    team.mkdir(), bundled.mkdir()
+    (team / "BUG-01.patch").write_text(GOOD_DIFF, encoding="utf-8")
+    (bundled / "BUG-01.diff").write_text(GOOD_DIFF, encoding="utf-8")
+    monkeypatch.setattr(bugs, "KNOWN_FIX_DIRS", [team, bundled])
+
+    proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM(["nope"] * 3))
+    assert "BUG-01.patch" in proposal.explanation
+
+
+def test_a_bundled_curated_fix_exists_for_bug_01():
+    from ai.fixer import known_fix_candidates
+
+    assert any(p.name == "BUG-01.diff" for p in known_fix_candidates("BUG-01"))
+
+
+def test_the_app_record_is_in_the_fixer_prompt(failing, scenario, bug):
+    from ai.fixer.prompt import build_user_prompt
+
+    prompt = build_user_prompt(failing, scenario, bug, "source")
+    assert "The app's own records show 0 capture(s)." in prompt
+    assert "ORDER_ALREADY_CAPTURED" in prompt  # the SDK notes explain why the same request id fixes it
