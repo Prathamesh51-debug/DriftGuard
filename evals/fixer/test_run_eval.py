@@ -45,3 +45,26 @@ def test_markdown_table_lists_the_numbers_and_failures():
     summary = evaluate("BUG-01", 2, lambda i: ScriptedLLM([good_reply()] if i == 1 else ["nope"] * 3))
     table = to_markdown(summary, "scripted")
     assert "| 2 | 1/2 | 1/2 | 1/2 |" in table and "run 2" in table
+
+
+def test_ablation_removes_the_sdk_notes_and_restores_them():
+    from ai.fixer import fixer as fixer_module
+    from ai.fixer import prompt
+    from evals.fixer.run_eval import without_sdk_notes
+
+    before = (dict(prompt.SDK_NOTES), fixer_module.SYSTEM_PROMPT)
+    with without_sdk_notes():
+        assert prompt.SDK_NOTES == {}
+        assert "listed under SDK notes" not in fixer_module.SYSTEM_PROMPT
+    assert (prompt.SDK_NOTES, fixer_module.SYSTEM_PROMPT) == before
+
+
+def test_blind_copy_drops_hint_comments_and_keeps_the_code(tmp_path):
+    from evals.fixer.run_eval import SHOP, blind_copy
+
+    original = (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8")
+    out = blind_copy(SHOP, tmp_path / "shop")
+    blind = (out / "src" / "checkout.ts").read_text(encoding="utf-8")
+    assert "BUG-01" in original and "BUG-01" not in blind
+    assert "ordersController.captureOrder(" in blind  # the code itself is untouched
+    assert (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8") == original  # the real shop is not modified

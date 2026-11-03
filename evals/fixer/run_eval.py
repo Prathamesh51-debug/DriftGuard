@@ -3,12 +3,16 @@ Fixer eval: run the Fixer N times on a bug and report how often it produces a co
 
     python -m evals.fixer.run_eval --runs 10 --providers anthropic
     python -m evals.fixer.run_eval --runs 5 --providers gemini,groq --save
+    python -m evals.fixer.run_eval --runs 10 --providers anthropic --no-sdk-notes --save   # ablation
+    python -m evals.fixer.run_eval --runs 10 --providers anthropic --blind --save          # no hints in the source
 
 Measures the model alone: the curated-fix fallback is off and the reply cache is off, so every
 run is a fresh sample. Paid providers go through the spend guard. Planner Ref: Part 8 (Fixer eval table).
 """
 
 import argparse
+import contextlib
+import re
 import shutil
 import tempfile
 import time
@@ -17,6 +21,8 @@ from pathlib import Path
 from typing import Callable, Dict, List
 
 from ai.fixer import apply_to_copy, find_bug, load_bugs, propose_fix
+from ai.fixer import fixer as fixer_module
+from ai.fixer import prompt as fixer_prompt
 from ai.fixer.llm import LLMClient, LLMError
 from ai.fixer.providers import SpendGuard, llm_from_env
 from contracts import Result, Scenario
@@ -27,6 +33,34 @@ SHOP = ROOT / "targets" / "demo-shop"
 FIXTURES = ROOT / "contracts" / "fixtures"
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 FIXTURES_BY_FAULT = {"F1_LOST_CAPTURE_RESPONSE": ("f1_scenario.json", "f1_result_fail.json")}
+
+
+HINT = re.compile(r"BUG-\d+|idempot|request-?id", re.IGNORECASE)
+
+
+def blind_copy(shop_dir: Path, into: Path) -> Path:
+    """Copy of the shop with every comment line that names the bug or its fix removed, so the model has
+    to find the problem from the failing result and the code, not from the seeded-bug comments."""
+    shutil.copytree(shop_dir, into, ignore=shutil.ignore_patterns("node_modules", ".git", "dist"))
+    for path in (into / "src").rglob("*.ts"):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        keep = [ln for ln in lines if not (ln.strip().startswith(("//", "*", "/*")) and HINT.search(ln))]
+        path.write_text("\n".join(keep) + "\n", encoding="utf-8")
+    return into
+
+
+@contextlib.contextmanager
+def without_sdk_notes():
+    """Ablation: take the APIMatic-derived SDK notes out of the prompt, and the rule that points at them."""
+    notes, system = fixer_prompt.SDK_NOTES, fixer_module.SYSTEM_PROMPT
+    fixer_prompt.SDK_NOTES = {}
+    fixer_module.SYSTEM_PROMPT = system.replace(
+        "Use only SDK options listed under SDK notes. Do not invent APIs.", "Do not invent APIs.")
+    assert fixer_module.SYSTEM_PROMPT != system, "system prompt rule changed; update the ablation"
+    try:
+        yield
+    finally:
+        fixer_prompt.SDK_NOTES, fixer_module.SYSTEM_PROMPT = notes, system
 
 
 def evaluate(bug_id: str, runs: int, llm_factory: Callable[[int], LLMClient], shop_dir: Path = SHOP) -> Dict:
@@ -102,18 +136,27 @@ def main() -> None:
     parser.add_argument("--bug", default="BUG-01")
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--providers", default=None, help='e.g. "anthropic" or "gemini,groq" (default: DRIFTGUARD_LLM)')
+    parser.add_argument("--no-sdk-notes", action="store_true", help="ablation: leave the APIMatic SDK notes out of the prompt")
+    parser.add_argument("--blind", action="store_true", help="strip comments that name the bug or its fix from the source")
     parser.add_argument("--save", action="store_true", help="also write the table to evals/fixer/results/")
     args = parser.parse_args()
 
-    summary = evaluate(args.bug, args.runs, lambda i: llm_from_env(args.providers, cache=False))
-    label = args.providers or "default providers"
+    workdir = Path(tempfile.mkdtemp(prefix="driftguard-blind-"))
+    try:
+        shop = blind_copy(SHOP, workdir / "shop") if args.blind else SHOP
+        with without_sdk_notes() if args.no_sdk_notes else contextlib.nullcontext():
+            summary = evaluate(args.bug, args.runs, lambda i: llm_from_env(args.providers, cache=False), shop)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    label = ", ".join([args.providers or "default providers"] + (["no SDK notes"] if args.no_sdk_notes else [])
+                      + (["blind source"] if args.blind else []))
     table = to_markdown(summary, label)
     print(table)
     if args.providers and "anthropic" in args.providers:
         print(f"Anthropic spend so far: ${SpendGuard(1.5).spent_usd:.4f}")
     if args.save:
         RESULTS_DIR.mkdir(exist_ok=True)
-        out = RESULTS_DIR / f"{args.bug}-{label.replace(',', '+')}.md"
+        out = RESULTS_DIR / f"{args.bug}-{label.replace(', ', '-').replace(' ', '-').replace(',', '+')}.md"
         out.write_text(table, encoding="utf-8")
         print(f"saved {out}")
 
