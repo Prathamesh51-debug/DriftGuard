@@ -233,3 +233,27 @@ Per `planner.md` (Part 7: Phase 2 Breadth), verify Fault F2 against `BUG-02` on 
 6. **Reconciliation:** Reconciler checked PayPal ledger evidence and discovered 2 orders were created in PayPal for a single user purchase.
 7. **Deterministic Verdict:** `FAIL: duplicate orders: 2 orders created in PayPal for single purchase without idempotency key`.
 
+---
+
+## [2026-11-04] Integration Milestone: Fault F3 (Forced Decline / False Fulfillment) Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID (PayPal Ground Truth):** `4U145438683322506`
+- **Real PayPal Captures:** `0` ($0.00 USD)
+- **App Recorded Captures:** `1` (False Success on 422)
+- **Rule Evaluated:** `app_recorded_captures == captures`
+- **Verdict:** `FAIL`
+- **Money Impact:** `state drift detected: expected 0 captures, got 0 in PayPal vs 1 in app (false fulfillment on INSTRUMENT_DECLINED)`
+
+### Context
+Per `planner.md` (Part 7: Phase 2 Breadth), verify Fault F3 against `BUG-03` on the Demo Shop.
+
+### Automated Sequence Observed
+1. **Target Order Creation:** Order created on PayPal Sandbox (`4U145438683322506`, $38.97 USD).
+2. **Headless Approval:** Playwright approved payment in `14.31s`.
+3. **Chaos Interception (F3):** Proxy intercepted `POST .../capture`, injected `PayPal-Mock-Response: {"mock_application_codes": "INSTRUMENT_DECLINED"}`, returning `HTTP 422 UNPROCESSABLE_ENTITY`.
+4. **BUG-03 Reproduction:** Demo shop caught 422, mistakenly treated decline as handled/complete, recorded a successful capture locally in `/_driftguard/state`, and responded with `HTTP 200 OK`.
+5. **Reconciliation:** Reconciler queried live PayPal records (0 captures, $0.00 paid) and merchant state (1 capture recorded).
+6. **Deterministic Verdict:** `FAIL: state drift detected: expected 0 captures, got 0 in PayPal vs 1 in app (false fulfillment on INSTRUMENT_DECLINED)`.
+
+

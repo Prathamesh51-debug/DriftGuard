@@ -83,6 +83,13 @@ class ChaosRouter:
             if injected:
                 fault_label = fault
 
+        error_preview = None
+        if real_status >= 400 and flow.response and flow.response.content:
+            try:
+                error_preview = flow.response.content.decode("utf-8")[:300]
+            except Exception:
+                pass
+
         # Shared JSONL audit entry — written for every PayPal API call
         audit_entry = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -93,6 +100,7 @@ class ChaosRouter:
             "request_body_hash": flow.metadata.get("req_body_hash"),
             "real_paypal_status": real_status,
             "real_order_id": flow.metadata.get("real_order_id"),
+            "error_preview": error_preview,
             "returned_status": flow.response.status_code if flow.response else 0,
             "fault_injected": fault_label,
             "duration_ms": duration_ms,

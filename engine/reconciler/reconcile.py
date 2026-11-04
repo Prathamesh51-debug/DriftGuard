@@ -194,7 +194,7 @@ def _verdict_f3(
     """
     num_captures = len(ledger["captures"])
     app_captures = extract_app_captures(app_state, order_id)
-    rule = "captures == 0 and app_recorded_captures == 0"
+    rule = "app_recorded_captures == captures"
 
     if num_captures == 0 and (app_captures is None or app_captures == 0):
         verdict = Verdict.PASS
@@ -203,8 +203,8 @@ def _verdict_f3(
         verdict = Verdict.FAIL
         if num_captures == 0 and app_captures and app_captures > 0:
             money_impact = (
-                f"false success: PayPal declined capture but app recorded {app_captures} captures — "
-                f"buyer not charged but merchant believes payment succeeded"
+                f"state drift detected: expected 0 captures, got 0 in PayPal vs "
+                f"{app_captures} in app (false fulfillment on INSTRUMENT_DECLINED)"
             )
         else:
             money_impact = (

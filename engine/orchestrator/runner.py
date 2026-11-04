@@ -35,10 +35,18 @@ def run_scenario(
 
     # 1. Create order on target shop
     print(f"\n[ORCHESTRATOR] 1. Creating order on {shop_base}/api/orders...")
+    order_amount = "38.97"
+    if scenario.expect.amount:
+        try:
+            if float(scenario.expect.amount) > 0:
+                order_amount = scenario.expect.amount
+        except ValueError:
+            pass
+
     try:
         res = requests.post(
             f"{shop_base}/api/orders",
-            json={"amount": scenario.expect.amount or "38.97"},
+            json={"amount": order_amount},
             timeout=15
         )
         if res.status_code not in (200, 201):
