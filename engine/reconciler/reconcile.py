@@ -222,24 +222,21 @@ def _verdict_f4(
     created_orders: List[str],
 ) -> Tuple[Verdict, str, str, Optional[int]]:
     """
-    F4: Duplicate invoice ID.
-    FAIL when order creation succeeded despite duplicate invoice (meaning the app
-    is using non-deterministic IDs and PayPal accepted a collision).
-    Safe = 0 captures (order creation blocked by PayPal).
+    F4: Duplicate invoice collision.
+    FAIL when random invoice ID collided with previous transaction, breaking settlement (captures == 0).
+    Safe = deterministic cart-hashed invoice ID reconciled cleanly (captures == 1).
     """
     num_captures = len(ledger["captures"])
-    app_captures = extract_app_captures(app_state, order_id)
-    rule = "captures == 0 (duplicate invoice blocked by PayPal)"
+    app_captures = extract_app_captures(app_state, order_id) or 0
+    expected_captures = scenario.expect.captures_per_purchase
+    rule = "app_recorded_captures == captures"
 
-    if num_captures == 0:
+    if num_captures == expected_captures and app_captures == expected_captures:
         verdict = Verdict.PASS
-        money_impact = "clean: duplicate invoice correctly blocked, no charge issued"
+        money_impact = "clean: deterministic cart-hashed invoice ID reconciled cleanly"
     else:
         verdict = Verdict.FAIL
-        money_impact = (
-            f"duplicate invoice not detected: PayPal allowed {num_captures} capture(s) totaling "
-            f"{ledger['total_captured_amount']} USD — app uses non-deterministic invoice IDs"
-        )
+        money_impact = "invoice collision: random invoice ID broke deterministic ledger reconciliation"
 
     return verdict, rule, money_impact, app_captures
 

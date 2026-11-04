@@ -256,4 +256,28 @@ Per `planner.md` (Part 7: Phase 2 Breadth), verify Fault F3 against `BUG-03` on 
 5. **Reconciliation:** Reconciler queried live PayPal records (0 captures, $0.00 paid) and merchant state (1 capture recorded).
 6. **Deterministic Verdict:** `FAIL: state drift detected: expected 0 captures, got 0 in PayPal vs 1 in app (false fulfillment on INSTRUMENT_DECLINED)`.
 
+---
+
+## [2026-11-04] Integration Milestone: Fault F4 (Duplicate Invoice Collision) Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID (PayPal Ground Truth):** `7KA26784KU852904D`
+- **Real PayPal Capture ID:** `7AW32964M2936391B` ($38.97 USD)
+- **App Recorded Captures:** `0` (Invoice Collision Failure)
+- **Rule Evaluated:** `app_recorded_captures == captures`
+- **Verdict:** `FAIL`
+- **Money Impact:** `invoice collision: random invoice ID broke deterministic ledger reconciliation`
+
+### Context
+Per `planner.md` (Part 7: Phase 2 Breadth), complete the Phase 2 Breadth gate: **F1 to F4 all RED on demo shop**.
+
+### Automated Sequence Observed
+1. **Target Order Creation:** Demo shop generated a non-deterministic random invoice ID (`INV-${Math.random()}`). Order created on PayPal Sandbox (`7KA26784KU852904D`).
+2. **Headless Approval:** Playwright approved payment in `13.95s`.
+3. **Chaos Interception (F4):** Proxy simulated an invoice ID collision against previously settled ledger records, returning `HTTP 409 DUPLICATE_INVOICE_ID` to the merchant application.
+4. **BUG-04 Reproduction:** Demo shop capture failed on invoice collision; shop recorded `0` captures locally.
+5. **Reconciliation:** Reconciler queried live PayPal Ground Truth (1 capture, $38.97 USD) vs app state (0 captures recorded).
+6. **Deterministic Verdict:** `FAIL: invoice collision: random invoice ID broke deterministic ledger reconciliation`.
+
+
 
