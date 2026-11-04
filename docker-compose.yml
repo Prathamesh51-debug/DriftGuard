@@ -39,7 +39,7 @@ services:
       --web-host 0.0.0.0
       --set web_port=8081
       --set ssl_insecure=true
-      --scripts /home/mitmproxy/addons/f1_lost_capture.py
+      --scripts /home/mitmproxy/addons/chaos_router.py
     ports:
       - "8080:8080"                     # Forward proxy endpoint (for targets using proxySettings)
       - "8082:8082"                     # Reverse proxy endpoint (for direct requests)
