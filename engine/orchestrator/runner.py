@@ -119,12 +119,30 @@ def run_scenario(
 
 
 if __name__ == "__main__":
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description="DriftGuard Automated Chaos Runner")
+    parser.add_argument(
+        "--fault",
+        default=os.getenv("DRIFTGUARD_FAULT", "F1").upper(),
+        help="Fault type to run (F1, F2, F3, F4). Defaults to env DRIFTGUARD_FAULT or F1",
+    )
+    args = parser.parse_args()
+
+    fault_key = args.fault.lower().split("_")[0]  # e.g. "f1" or "f2"
     fixtures_dir = ROOT_DIR / "contracts" / "fixtures"
-    f1_scenario = Scenario.model_validate_json((fixtures_dir / "f1_scenario.json").read_text(encoding="utf-8"))
-    
+    scenario_path = fixtures_dir / f"{fault_key}_scenario.json"
+
+    if not scenario_path.exists():
+        print(f"Error: Fixture not found at {scenario_path}")
+        sys.exit(1)
+
+    scenario = Scenario.model_validate_json(scenario_path.read_text(encoding="utf-8"))
+
     print("=================================================================")
-    print("DRIFTGUARD AUTOMATED CHAOS LOOP: FAULT F1 (LOST CAPTURE RESPONSE)")
+    print(f"DRIFTGUARD AUTOMATED CHAOS LOOP: FAULT {args.fault.upper()}")
     print("=================================================================")
-    res = run_scenario(f1_scenario)
+    res = run_scenario(scenario)
     print("\n======================= FINAL RESULT =======================")
     print(res.model_dump_json(indent=2))

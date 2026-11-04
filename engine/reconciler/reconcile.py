@@ -3,22 +3,63 @@ Deterministic Reconciler: Compares PayPal ground truth against local merchant st
 Planner Ref: Role Playbook A (A3 - Reconciler).
 Rule 1: AI proposes, code decides.
 Rule 2: Every verdict traces to PayPal IDs.
+
+Supported faults:
+  F1 — Lost capture response  (capture drift: PayPal 1, app 0)
+  F2 — Slow PayPal / timeout  (order drift: blind retry creates 2nd order)
+  F3 — Forced decline         (false success: 422 treated as COMPLETED by app)
+  F4 — Duplicate invoice      (order creation fails; app should not record order)
 """
 
 import sys
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import requests
+
+from datetime import datetime, timezone
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from contracts import Evidence, ObservedState, Result, Scenario, Verdict
+from contracts import Evidence, FaultType, ObservedState, Result, Scenario, Verdict
 from .client import PayPalClient
 
 DEFAULT_LOG_PATH = ROOT_DIR / "logs" / "proxy_traffic.jsonl"
+
+
+def harvest_created_orders(order_id: str, log_path: Optional[Path] = None, max_age_seconds: int = 120) -> List[str]:
+    """
+    Harvests all PayPal order IDs created during the recent session from proxy JSONL logs.
+    Used by F2 to detect un-idempotent retries creating duplicate orders in PayPal.
+    """
+    path = log_path or DEFAULT_LOG_PATH
+    order_ids: List[str] = [order_id] if order_id else []
+    if not path.exists():
+        return order_ids
+
+    now_utc = datetime.now(timezone.utc)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip()]
+            for line in lines[-20:]:
+                entry = json.loads(line)
+                ts_str = entry.get("timestamp")
+                if ts_str:
+                    try:
+                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                        if (now_utc - ts).total_seconds() > max_age_seconds:
+                            continue
+                    except Exception:
+                        pass
+                if entry.get("path") == "/v2/checkout/orders" and entry.get("real_paypal_status") in (200, 201):
+                    oid = entry.get("real_order_id")
+                    if oid and oid not in order_ids:
+                        order_ids.append(oid)
+    except Exception:
+        pass
+    return order_ids
 
 
 def harvest_proxy_log_refs(order_id: str, log_path: Optional[Path] = None) -> List[str]:
@@ -60,6 +101,158 @@ def fetch_app_state(demo_shop_url: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def extract_app_captures(app_state: Optional[Dict[str, Any]], order_id: str) -> Optional[int]:
+    """Extract recorded capture count for an order from target app state."""
+    if not app_state:
+        return None
+    for order in app_state.get("orders", []):
+        if order.get("orderId") == order_id:
+            return order.get("captureCount")
+    return app_state.get("totalCapturesRecorded", 0)
+
+
+def _verdict_f1(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F1: Lost capture response.
+    FAIL when PayPal has >=1 capture but app recorded 0.
+    """
+    num_captures = len(ledger["captures"])
+    app_captures = extract_app_captures(app_state, order_id)
+    expected = scenario.expect.captures_per_purchase
+    rule = "app_recorded_captures == captures"
+
+    if app_captures is not None and app_captures == num_captures == expected:
+        verdict = Verdict.PASS
+        money_impact = f"clean: exactly one capture (+{ledger['total_captured_amount']} USD)"
+    else:
+        verdict = Verdict.FAIL
+        if num_captures > 0 and (app_captures is None or app_captures == 0):
+            money_impact = (
+                f"buyer charged, but app recorded 0 captures: "
+                f"{ledger['total_captured_amount']} USD paid without fulfillment"
+            )
+        elif num_captures > expected:
+            money_impact = (
+                f"buyer double-charged: {num_captures} captures totaling "
+                f"{ledger['total_captured_amount']} USD"
+            )
+        else:
+            money_impact = (
+                f"state drift: expected {expected} captures, "
+                f"PayPal has {num_captures}, app has {app_captures}"
+            )
+
+    return verdict, rule, money_impact, app_captures
+
+
+def _verdict_f2(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F2: Slow PayPal (blind retry on order creation timeout).
+    FAIL when blind retry created duplicate orders in PayPal ground truth.
+    Safe = exactly 1 order created in PayPal.
+    """
+    orders_created = len(created_orders)
+    app_captures = extract_app_captures(app_state, order_id)
+    rule = "orders_created == 1"
+
+    if orders_created <= 1:
+        verdict = Verdict.PASS
+        money_impact = "clean: idempotent order creation prevented duplicate PayPal orders"
+    else:
+        verdict = Verdict.FAIL
+        money_impact = (
+            f"duplicate orders: {orders_created} orders created in PayPal for "
+            f"single purchase without idempotency key"
+        )
+
+    return verdict, rule, money_impact, app_captures
+
+
+def _verdict_f3(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F3: Forced decline (INSTRUMENT_DECLINED mock).
+    FAIL when PayPal declined (0 captures) but app recorded a capture anyway (BUG-03).
+    Safe = PayPal 0 captures AND app 0 captures.
+    """
+    num_captures = len(ledger["captures"])
+    app_captures = extract_app_captures(app_state, order_id)
+    rule = "captures == 0 and app_recorded_captures == 0"
+
+    if num_captures == 0 and (app_captures is None or app_captures == 0):
+        verdict = Verdict.PASS
+        money_impact = "clean: PayPal declined, app correctly recorded 0 captures"
+    else:
+        verdict = Verdict.FAIL
+        if num_captures == 0 and app_captures and app_captures > 0:
+            money_impact = (
+                f"false success: PayPal declined capture but app recorded {app_captures} captures — "
+                f"buyer not charged but merchant believes payment succeeded"
+            )
+        else:
+            money_impact = (
+                f"decline state drift: PayPal has {num_captures} captures, app has {app_captures}"
+            )
+
+    return verdict, rule, money_impact, app_captures
+
+
+def _verdict_f4(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F4: Duplicate invoice ID.
+    FAIL when order creation succeeded despite duplicate invoice (meaning the app
+    is using non-deterministic IDs and PayPal accepted a collision).
+    Safe = 0 captures (order creation blocked by PayPal).
+    """
+    num_captures = len(ledger["captures"])
+    app_captures = extract_app_captures(app_state, order_id)
+    rule = "captures == 0 (duplicate invoice blocked by PayPal)"
+
+    if num_captures == 0:
+        verdict = Verdict.PASS
+        money_impact = "clean: duplicate invoice correctly blocked, no charge issued"
+    else:
+        verdict = Verdict.FAIL
+        money_impact = (
+            f"duplicate invoice not detected: PayPal allowed {num_captures} capture(s) totaling "
+            f"{ledger['total_captured_amount']} USD — app uses non-deterministic invoice IDs"
+        )
+
+    return verdict, rule, money_impact, app_captures
+
+
+# Dispatch table: fault → verdict function
+_VERDICT_FNS = {
+    FaultType.F1_LOST_CAPTURE_RESPONSE: _verdict_f1,
+    FaultType.F2_SLOW_PAYPAL: _verdict_f2,
+    FaultType.F3_FORCED_DECLINE: _verdict_f3,
+    FaultType.F4_DUPLICATE_INVOICE: _verdict_f4,
+}
+
+
 def reconcile_order(
     scenario: Scenario,
     order_id: str,
@@ -70,73 +263,55 @@ def reconcile_order(
     """
     Reconciles an executed order against PayPal Ground Truth and target app state.
     Produces a mathematically sound, fully validated contracts.Result.
+    Fault-specific verdict rules are dispatched uniformly from _VERDICT_FNS.
     """
     paypal = client or PayPalClient()
-    
+
     # 1. Fetch live PayPal ledger records
     raw_order = paypal.get_order(order_id)
     ledger = paypal.parse_order_ledger(raw_order)
 
     # 2. Fetch demo shop internal state
     app_state = fetch_app_state(demo_shop_url)
-    app_captures = None
-    if app_state:
-        # Find this specific order in the demo shop orders list
-        for order in app_state.get("orders", []):
-            if order.get("orderId") == order_id:
-                app_captures = order.get("captureCount")
-                break
-        if app_captures is None:
-            # Fall back to aggregate if order isn't isolated
-            app_captures = app_state.get("totalCapturesRecorded", 0)
 
-    # 3. Harvest proxy log references
+    # 3. Harvest proxy log references and all created PayPal orders
     proxy_refs = harvest_proxy_log_refs(order_id, log_path)
+    created_orders = harvest_created_orders(order_id, log_path)
 
-    # 4. Construct ObservedState
-    num_captures = len(ledger["captures"])
+    # 4. Run fault-specific verdict logic (Code decides — never an LLM)
+    verdict_fn = _VERDICT_FNS.get(scenario.fault)
+    if verdict_fn is None:
+        return Result(
+            scenario_id=scenario.scenario_id,
+            verdict=Verdict.ERROR,
+            rule="unsupported_fault_type",
+            observed=ObservedState(captures=0, amount_captured="0.00"),
+            evidence=Evidence(paypal_order_ids=created_orders, proxy_log_refs=proxy_refs),
+            money_impact="error: no reconciler rule implemented for this fault type",
+            error_message=f"Fault '{scenario.fault}' has no verdict function in _VERDICT_FNS. Add one before running this scenario.",
+        )
+
+    verdict, rule, money_impact, app_captures = verdict_fn(
+        scenario, ledger, app_state, order_id, created_orders
+    )
+
+    # 5. Construct ObservedState (Generic: derives directly from ledger & harvested orders)
     observed = ObservedState(
-        captures=num_captures,
+        captures=len(ledger["captures"]),
         amount_captured=ledger["total_captured_amount"],
-        orders_created=1,
+        orders_created=len(created_orders),
         refunds_issued=len(ledger["refunds"]),
         app_recorded_captures=app_captures,
     )
 
-    # 5. Construct Evidence
+    # 6. Construct Evidence (Generic: includes all discovered order IDs & evidence)
     evidence = Evidence(
-        paypal_order_ids=[order_id],
+        paypal_order_ids=created_orders,
         paypal_capture_ids=ledger["capture_ids"],
         paypal_refund_ids=ledger["refund_ids"],
         proxy_log_refs=proxy_refs,
         webhook_event_ids=[],
     )
-
-    # 6. Deterministic Verdict Computation (Code decides!)
-    rule = "app_recorded_captures == captures"
-    expected_captures = scenario.expect.captures_per_purchase
-
-    # Check state drift: does app state match PayPal reality?
-    if app_captures is not None and app_captures == num_captures and num_captures == expected_captures:
-        verdict = Verdict.PASS
-        money_impact = f"clean: exactly one capture (+{observed.amount_captured} USD)"
-    else:
-        verdict = Verdict.FAIL
-        if num_captures > 0 and (app_captures is None or app_captures == 0):
-            money_impact = (
-                f"buyer charged, but app recorded 0 captures: "
-                f"{observed.amount_captured} USD paid without fulfillment"
-            )
-        elif num_captures > expected_captures:
-            money_impact = (
-                f"buyer double-charged: {num_captures} captures totaling "
-                f"{observed.amount_captured} USD"
-            )
-        else:
-            money_impact = (
-                f"state drift detected: expected {expected_captures} captures, "
-                f"got {num_captures} in PayPal vs {app_captures} in app"
-            )
 
     return Result(
         scenario_id=scenario.scenario_id,
