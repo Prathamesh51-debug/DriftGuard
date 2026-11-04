@@ -5,7 +5,7 @@ Built for the PayPal AI Hackathon 2026.
 
 [![PayPal AI Hackathon](https://img.shields.io/badge/PayPal_AI_Hackathon-2026-003087?style=for-the-badge)](https://paypalaihackathon.devpost.com/)
 [![Built with APIMatic](https://img.shields.io/badge/APIMatic-Context_Plugin-10A37F?style=for-the-badge)](#)
-[![Powered by AG Grid](https://img.shields.io/badge/AG_Grid-Enterprise-FF4081?style=for-the-badge)](#)
+[![Powered by AG Grid Community](https://img.shields.io/badge/AG_Grid-Community-5B9DFF?style=for-the-badge)](#)
 
 ## The Problem
 Wiring language models to payment APIs introduces subtle, high-severity distributed systems bugs that mocked unit tests miss. When an AI agent drops an HTTP packet mid-capture, rounds a fractional tax calculation by $0.04, or receives a spoofed dispute webhook, it drifts from reality. The agent tells the user one thing, the local database records another, and the PayPal ledger reflects a third—often resulting in catastrophic double-charges or unauthorized refunds.
@@ -30,30 +30,26 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 
 ## Quick Start
 
-**Prerequisites:** Docker, Node.js 20+, and a PayPal Sandbox Business Account.
+### Open the dashboard with fixture data
 
-1. **Clone & Configure**
+This starts the dashboard against the local mock API. It does not call PayPal or an LLM.
+
+1. Start the mock API from the repository root:
    ```bash
-   git clone https://github.com/Prathamesh51-debug/DriftGuard.git
-   cd DriftGuard
-   cp .env.example .env
-   # Add your PayPal Sandbox Client ID, Secret, and Anthropic API key
+   pip install -r mock_runner/requirements.txt
+   uvicorn mock_runner.app:app --port 8000
    ```
-
-2. **Boot the Harness**
+2. In another terminal, start the dashboard:
    ```bash
-   make up
+   cd dashboard
+   npm install
+   npm run dev
    ```
-   *This spins up the Postgres database, the mitmproxy interceptor, the orchestrator worker, and the AG Grid dashboard.*
+3. Open `http://localhost:5173/` for the API-backed dashboard. `/live` is an equivalent direct route.
 
-3. **Run a Chaos Suite Against a Target**
-   ```bash
-   # Using the DriftGuard CLI
-   driftguard run ./path/to/target/ai-agent-repo
-   ```
+### Connect the real engine
 
-4. **View the Ledger**
-   Open `http://localhost:3000` to watch the live AG Grid telemetry matrix as DriftGuard drops packets, checks PayPal's ledger, and turns red rows green.
+Copy `.env.example` to `.env` and configure the sandbox and model-provider credentials. `make up` starts Postgres and mitmproxy; it does not start the API or dashboard. Start the engine API separately with `make api`, then run the dashboard as above. The dashboard defaults to `http://localhost:8000`; set `VITE_API_URL` if the API is hosted elsewhere.
 
 ## Repository Structure
 * `/engine` - The MITM proxy, deterministic reconciler, and API orchestrator.

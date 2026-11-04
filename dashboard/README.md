@@ -17,13 +17,16 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
+Open `http://localhost:5173/` for the API-backed dashboard. `/live` is an equivalent direct route.
+
 To point at the real engine instead, set `VITE_API_URL` (default `http://localhost:8000`).
+`make up` starts Postgres and mitmproxy only; start the engine API separately with `make api`.
 
 ## What's here
 
 - `src/api.ts` is the API client (`GET /runs`, `POST /runs`, `POST /runs/{id}/rerun`).
 - `src/types.ts` mirrors `contracts/models.py`. Keep them in sync.
-- `src/components/RunsGrid.tsx` is the results matrix (AG Grid Community).
+- `src/components/RunsGrid.tsx` is the results matrix (AG Grid Community). Arrow keys move through grid cells; Enter or Space opens the selected run's evidence.
 - `src/components/EvidenceDrawer.tsx` shows expected vs observed, PayPal IDs, and the scenario.
 - `src/components/VerdictChip.tsx` is the PASS / FAIL / ERROR / RUNNING chip.
 
