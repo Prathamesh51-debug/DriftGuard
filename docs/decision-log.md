@@ -208,3 +208,28 @@ Per `planner.md` (Part 4 & Part 6: Mon 2 Nov Integration Gate), achieve the firs
 4. **BUG-01 Reproduction:** Demo shop retried capture blindly without `PayPal-Request-Id`. PayPal returned `422 UNPROCESSABLE_ENTITY (ORDER_ALREADY_CAPTURED)`. Demo shop recorded `0` captures in `/_driftguard/state`.
 5. **Reconciliation:** Reconciler queried live PayPal Ground Truth (Captures = 1, $38.97 USD) and compared with app state (0).
 6. **Verdict Emitted:** `FAIL: buyer charged, but app recorded 0 captures: 38.97 USD paid without fulfillment`.
+
+---
+
+## [2026-11-04] Integration Milestone: Fault F2 (Slow PayPal / Timeout) Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order IDs (PayPal Ground Truth):** `9983267541997254A` (Attempt 1), `9CX04545KS102981Y` (Attempt 2)
+- **Real PayPal Capture ID:** `8KK6439477146883L`
+- **Rule Evaluated:** `orders_created == 1`
+- **Observed:** `orders_created = 2`, `captures = 1` ($38.97 USD)
+- **Verdict:** `FAIL`
+- **Money Impact:** `duplicate orders: 2 orders created in PayPal for single purchase without idempotency key`
+
+### Context
+Per `planner.md` (Part 7: Phase 2 Breadth), verify Fault F2 against `BUG-02` on the Demo Shop.
+
+### Automated Sequence Observed
+1. **Target Order Creation (Attempt 1):** Target shop initiated order creation. PayPal created Order `9983267541997254A`.
+2. **Chaos Interception (F2):** Proxy intercepted response, delayed 1,000ms, and returned `HTTP 504 Gateway Timeout`.
+3. **BUG-02 Reproduction:** Demo shop caught timeout and blindly retried `createOrder` without an idempotency key (`paypalRequestId`).
+4. **Target Order Creation (Attempt 2):** PayPal treated the retry as a new transaction and created duplicate Order `9CX04545KS102981Y`.
+5. **Headless Approval & Capture:** Playwright approved Order 2 in ~11s. Target shop captured Order 2 (`8KK6439477146883L`).
+6. **Reconciliation:** Reconciler checked PayPal ledger evidence and discovered 2 orders were created in PayPal for a single user purchase.
+7. **Deterministic Verdict:** `FAIL: duplicate orders: 2 orders created in PayPal for single purchase without idempotency key`.
+
