@@ -22,6 +22,8 @@ const theme = studioTheme.withParams({
   menuBackgroundColor: '#171c24',
   menuTextColor: '#e6e9ee',
   fontFamily: 'Inter, system-ui, sans-serif',
+  studioAiPanelWidth: 420,
+  studioAiPanelInputMessageBackgroundColor: '#1b2940',
 })
 
 const LICENCE_KEY: string | undefined = import.meta.env.VITE_AG_STUDIO_KEY
@@ -38,7 +40,16 @@ export default function StudioPanel({ runs }: { runs: Run[] }) {
   return (
     <div className="studio-wrap">
       <AgStudioProvider licenseKey={LICENCE_KEY}>
-        <AgStudio style={{ height: '100%' }} theme={theme} data={data} initialState={initialReport} mode="edit" ai={ai} />
+        <AgStudio
+          style={{ height: '100%' }}
+          theme={theme}
+          data={data}
+          initialState={initialReport}
+          mode="edit"
+          panels={{ edit: { right: ['ai', 'edit', 'data'] } }}
+          localeText={{ panelTitleAi: 'Ask Studio' }}
+          ai={ai}
+        />
       </AgStudioProvider>
     </div>
   )

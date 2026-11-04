@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FixState, Result, Run } from '../types'
 import { elapsedSeconds, faultLabel, shortId } from '../format'
 import { VerdictChip } from './VerdictChip'
@@ -88,11 +88,17 @@ export function EvidenceDrawer({
   onRerun: (runId: string) => void
   onPropose: () => void
 }) {
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [run.run_id])
 
   const { scenario, result } = run
   const wantAmount = scenario.expect.amount
@@ -103,7 +109,7 @@ export function EvidenceDrawer({
       <header className="drawer-head">
         <div>
           <div className="eyebrow">Run {shortId(run.run_id)}</div>
-          <h2>{faultLabel(scenario.fault)}</h2>
+          <h2 ref={headingRef} tabIndex={-1}>{faultLabel(scenario.fault)}</h2>
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Close evidence drawer">
           ✕
@@ -121,46 +127,68 @@ export function EvidenceDrawer({
 
             {result.verdict !== 'ERROR' && (
               <>
-            <h3>Expected vs observed</h3>
-            <table className="compare">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Expected</th>
-                  <th>Observed (PayPal)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Captures (PayPal)</td>
-                  <td className="mono">{scenario.expect.captures_per_purchase}</td>
-                  <td
-                    className={`mono ${result.observed.captures !== scenario.expect.captures_per_purchase ? 'bad' : ''}`}
-                  >
-                    {result.observed.captures}
-                  </td>
-                </tr>
-                {result.observed.app_recorded_captures != null && (
-                  <tr>
-                    <td>Captures (app&apos;s own records)</td>
-                    <td className="mono">{result.observed.captures}</td>
-                    <td
-                      className={`mono ${result.observed.app_recorded_captures !== result.observed.captures ? 'bad' : ''}`}
-                    >
-                      {result.observed.app_recorded_captures}
-                    </td>
-                  </tr>
-                )}
-                <tr>
-                  <td>Amount ({scenario.expect.currency})</td>
-                  <td className="mono">{wantAmount ?? '—'}</td>
-                  <td className={`mono ${wantAmount && wantAmount !== result.observed.amount_captured ? 'bad' : ''}`}>
-                    {result.observed.amount_captured}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <p className="muted small mono">rule: {result.rule}</p>
+                <h3 id="proof-chain-heading">Evidence trail</h3>
+                <ol className="proof-chain" aria-labelledby="proof-chain-heading">
+                  <li>
+                    <strong>Configured fault</strong>
+                    <span><code>{scenario.inject.action}</code> on <code>{scenario.inject.on}</code></span>
+                  </li>
+                  <li>
+                    <strong>PayPal record</strong>
+                    <span>{result.observed.captures} capture(s); {result.observed.amount_captured} {scenario.expect.currency}</span>
+                  </li>
+                  {result.observed.app_recorded_captures != null && (
+                    <li>
+                      <strong>App record</strong>
+                      <span>{result.observed.app_recorded_captures} capture(s)</span>
+                    </li>
+                  )}
+                  <li>
+                    <strong>Rule decision</strong>
+                    <span><code>{result.rule}</code> · {result.verdict}</span>
+                  </li>
+                </ol>
+                <p className="muted small proof-note">This trail uses saved run fields; it does not invent event timings.</p>
+                <h3>Expected vs observed</h3>
+                <table className="compare">
+                  <thead>
+                    <tr>
+                      <th />
+                      <th>Expected</th>
+                      <th>Observed (PayPal)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Captures (PayPal)</td>
+                      <td className="mono">{scenario.expect.captures_per_purchase}</td>
+                      <td
+                        className={`mono ${result.observed.captures !== scenario.expect.captures_per_purchase ? 'bad' : ''}`}
+                      >
+                        {result.observed.captures}
+                      </td>
+                    </tr>
+                    {result.observed.app_recorded_captures != null && (
+                      <tr>
+                        <td>Captures (app&apos;s own records)</td>
+                        <td className="mono">{result.observed.captures}</td>
+                        <td
+                          className={`mono ${result.observed.app_recorded_captures !== result.observed.captures ? 'bad' : ''}`}
+                        >
+                          {result.observed.app_recorded_captures}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td>Amount ({scenario.expect.currency})</td>
+                      <td className="mono">{wantAmount ?? '—'}</td>
+                      <td className={`mono ${wantAmount && wantAmount !== result.observed.amount_captured ? 'bad' : ''}`}>
+                        {result.observed.amount_captured}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="muted small mono">rule: {result.rule}</p>
               </>
             )}
 

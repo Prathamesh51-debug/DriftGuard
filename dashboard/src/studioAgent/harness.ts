@@ -46,8 +46,9 @@ export function buildHarness(api: AgStudioApi, adapter: AgLlmAdapter, getRuns: (
       ],
       primary: 'lead',
       promptStarters: [
-        { label: 'Why did the latest run fail?', prompt: 'Why did the most recent run fail? Explain it in plain words and say what it cost.' },
-        { label: 'How many runs lost a payment?', prompt: 'How many runs ended with PayPal showing a capture that the app did not record? List them.' },
+        { label: 'What does this run do?', prompt: 'Explain what the latest run tests, what happened, and its verdict in plain words.' },
+        { label: 'Summarize this error', prompt: 'Summarize the most recent run error or failure and cite the recorded evidence.' },
+        { label: 'How would I fix it?', prompt: 'For the latest failed run, explain a safe fix based on its evidence. Do not claim code was changed.' },
       ],
     }
   })

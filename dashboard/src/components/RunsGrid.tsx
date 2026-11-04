@@ -32,6 +32,12 @@ function EmptyOverlay({ message }: { message: string }) {
   return <span className="muted">{message}</span>
 }
 
+function gridCellFromEvent(event?: Event | null): HTMLElement | undefined {
+  return event?.target instanceof HTMLElement
+    ? event.target.closest<HTMLElement>('.ag-cell') ?? undefined
+    : undefined
+}
+
 export function RunsGrid({
   runs,
   selectedId,
@@ -41,7 +47,7 @@ export function RunsGrid({
 }: {
   runs: Run[]
   selectedId: string | null
-  onSelect: (runId: string) => void
+  onSelect: (runId: string, opener?: HTMLElement) => void
   loading: boolean
   emptyMessage: string
 }) {
@@ -121,19 +127,60 @@ export function RunsGrid({
 
   return (
     <div className="grid-wrap">
-      <AgGridReact<Run>
-        ref={gridRef}
-        theme={theme}
-        rowData={runs}
-        columnDefs={columns}
-        getRowId={(p) => p.data.run_id}
-        onRowClicked={(e) => e.data && onSelect(e.data.run_id)}
-        getRowClass={(p) => (p.data?.run_id === selectedId ? 'row-selected' : '')}
-        loading={loading}
-        noRowsOverlayComponent={EmptyOverlay}
-        noRowsOverlayComponentParams={{ message: emptyMessage }}
-        suppressCellFocus
-      />
+      <p id="run-grid-instructions" className="sr-only">
+        Use the arrow keys to move through run results. Press Enter or Space to open evidence for a run.
+      </p>
+      <div className="desktop-run-grid" role="region" aria-label="Run results" aria-describedby="run-grid-instructions">
+        <AgGridReact<Run>
+          ref={gridRef}
+          theme={theme}
+          rowData={runs}
+          columnDefs={columns}
+          getRowId={(p) => p.data.run_id}
+          onRowClicked={(e) => e.data && onSelect(e.data.run_id, gridCellFromEvent(e.event))}
+          onCellKeyDown={(e) => {
+            if (!e.data || !(e.event instanceof KeyboardEvent)) return
+            if (e.event.key !== 'Enter' && e.event.key !== ' ') return
+            e.event.preventDefault()
+            onSelect(e.data.run_id, gridCellFromEvent(e.event))
+          }}
+          getRowClass={(p) => (p.data?.run_id === selectedId ? 'row-selected' : '')}
+          loading={loading}
+          noRowsOverlayComponent={EmptyOverlay}
+          noRowsOverlayComponentParams={{ message: emptyMessage }}
+        />
+      </div>
+      <section className="mobile-run-list" aria-label="Run results">
+        {loading ? <p className="muted mobile-run-empty" role="status">Loading runs…</p> : runs.length === 0 ? (
+          <p className="muted mobile-run-empty">{emptyMessage}</p>
+        ) : runs.map((run) => {
+          const verdict = run.result?.verdict ?? 'RUNNING'
+          const appCaptures = run.result?.observed.app_recorded_captures
+          return (
+            <button
+              key={run.run_id}
+              id={`mobile-run-${run.run_id}`}
+              className={`mobile-run-card ${selectedId === run.run_id ? 'is-selected' : ''}`}
+              aria-label={`Open evidence for run ${shortId(run.run_id)}, ${verdict}, ${faultLabel(run.scenario.fault)}`}
+              aria-pressed={selectedId === run.run_id}
+              onClick={(event) => onSelect(run.run_id, event.currentTarget)}
+            >
+              <span className="mobile-run-head">
+                <span className="mono">{shortId(run.run_id)}</span>
+                <VerdictChip run={run} />
+              </span>
+              <span className="mobile-run-fault">{faultLabel(run.scenario.fault)}</span>
+              <span className="mobile-run-meta">
+                <span>{run.result?.money_impact ?? 'Waiting for PayPal records'}</span>
+                <time>{timeAgo(run.created_at)}</time>
+              </span>
+              {run.result && appCaptures != null && (
+                <span className="mobile-run-proof">PayPal {run.result.observed.captures} · app {appCaptures} captures</span>
+              )}
+            </button>
+          )
+        })}
+      </section>
     </div>
   )
 }

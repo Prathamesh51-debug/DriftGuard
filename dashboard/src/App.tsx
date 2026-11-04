@@ -1,9 +1,11 @@
-import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { API_URL, launchRun, listRuns, proposeFix, rerunRun } from './api'
 import type { FixState, Run } from './types'
 import { RunsGrid } from './components/RunsGrid'
 import { EvidenceDrawer } from './components/EvidenceDrawer'
 import { BeforeAfter } from './components/BeforeAfter'
+import { nextPollDelay } from './polling'
+import { dashboardSurface, initialLiveView } from './routing'
 import { originalOf, rerunOf } from './beforeAfter'
 import './App.css'
 import './beforeAfter.css'
@@ -29,7 +31,7 @@ class StudioBoundary extends Component<{ children: ReactNode }, { failed: string
   }
 }
 
-export default function App() {
+function LiveDashboardApp() {
   const [runs, setRuns] = useState<Run[]>([])
   const [offline, setOffline] = useState(false)
   const [reconnected, setReconnected] = useState(false)
@@ -37,13 +39,35 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const [view, setView] = useState<'runs' | 'studio'>('runs')
+  const [view, setView] = useState<'runs' | 'studio'>(() => initialLiveView(window.location.search))
   const [fixes, setFixes] = useState<Record<string, FixState>>({})
   const [compareBeforeId, setCompareBeforeId] = useState<string | null>(null)
   const wasOffline = useRef(false)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const evidenceReturnFocus = useRef<HTMLElement | null>(null)
 
-  const refresh = useCallback(async () => {
+  const openEvidence = (runId: string, opener?: HTMLElement) => {
+    evidenceReturnFocus.current = opener ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+    setSelectedId(runId)
+  }
+
+  const closeEvidence = () => {
+    const closingRunId = selectedId
+    setSelectedId(null)
+    requestAnimationFrame(() => {
+      const opener = evidenceReturnFocus.current
+      if (opener?.isConnected) {
+        opener.focus()
+      } else if (closingRunId) {
+        const fallback = document.getElementById(`mobile-run-${closingRunId}`)
+          ?? document.querySelector<HTMLElement>('.desktop-run-grid .ag-cell')
+        fallback?.focus()
+      }
+      evidenceReturnFocus.current = null
+    })
+  }
+
+  const refresh = useCallback(async (): Promise<boolean> => {
     try {
       setRuns(await listRuns())
       setOffline(false)
@@ -53,25 +77,73 @@ export default function App() {
         clearTimeout(reconnectTimer.current)
         reconnectTimer.current = setTimeout(() => setReconnected(false), 3000)
       }
+      return true
     } catch {
       wasOffline.current = true
       setReconnected(false)
       setOffline(true)
+      return false
     } finally {
       setLoaded(true)
     }
   }, [])
 
   useEffect(() => {
-    void refresh()
-    const timer = setInterval(() => void refresh(), 1000)
+    let cancelled = false
+    let inFlight = false
+    let failures = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const poll = async () => {
+      if (cancelled || inFlight) return
+      if (document.visibilityState === 'hidden') {
+        timer = setTimeout(() => void poll(), 5000)
+        return
+      }
+
+      inFlight = true
+      const succeeded = await refresh()
+      inFlight = false
+      if (cancelled) return
+      failures = succeeded ? 0 : failures + 1
+      timer = setTimeout(() => void poll(), nextPollDelay(failures))
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      if (timer) clearTimeout(timer)
+      timer = undefined
+      void poll()
+    }
+
+    void poll()
+    document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
-      clearInterval(timer)
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       clearTimeout(reconnectTimer.current)
     }
   }, [refresh])
 
+  const onViewTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, current: 'runs' | 'studio') => {
+    const next = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+      ? (current === 'runs' ? 'studio' : 'runs')
+      : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+        ? (current === 'studio' ? 'runs' : 'studio')
+        : event.key === 'Home'
+          ? 'runs'
+          : event.key === 'End'
+            ? 'studio'
+            : null
+    if (!next) return
+    event.preventDefault()
+    setView(next)
+    requestAnimationFrame(() => document.getElementById(`view-tab-${next}`)?.focus())
+  }
+
   const act = async (fn: () => Promise<Run>): Promise<Run | undefined> => {
+    evidenceReturnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setBusy(true)
     setActionError(null)
     try {
@@ -128,7 +200,17 @@ export default function App() {
         <div className="topbar-right">
           <div className="tabs" role="tablist" aria-label="View">
             {(['runs', 'studio'] as const).map((v) => (
-              <button key={v} role="tab" aria-selected={view === v} className={`tab ${view === v ? 'tab-on' : ''}`} onClick={() => setView(v)}>
+            <button
+              key={v}
+              id={`view-tab-${v}`}
+              role="tab"
+              aria-selected={view === v}
+              aria-controls="live-view-panel"
+              tabIndex={view === v ? 0 : -1}
+              className={`tab ${view === v ? 'tab-on' : ''}`}
+              onClick={() => setView(v)}
+              onKeyDown={(event) => onViewTabKeyDown(event, v)}
+            >
                 {v === 'runs' ? 'Runs' : 'Studio'}
               </button>
             ))}
@@ -153,8 +235,8 @@ export default function App() {
           {offline && (
             <div className="banner" role="alert">
               {runs.length > 0
-                ? 'Connection lost. Showing the last known runs. Retrying every second.'
-                : `Can't reach the engine at ${API_URL}. Retrying every second. Is the mock runner or engine running?`}
+                ? 'Connection lost. Showing the last known runs. Retrying automatically with backoff.'
+                : `Can't reach the engine at ${API_URL}. Retrying automatically with backoff. Is the mock runner or engine running?`}
             </div>
           )}
           {reconnected && (
@@ -173,7 +255,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="main">
+      <main id="live-view-panel" className="main" role="tabpanel" aria-labelledby={`view-tab-${view}`} tabIndex={0}>
         {view === 'studio' ? (
           <StudioBoundary>
             <Suspense fallback={<p className="muted">Loading Studio…</p>}>
@@ -184,7 +266,7 @@ export default function App() {
         <RunsGrid
           runs={runs}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={openEvidence}
           loading={!loaded}
           emptyMessage={
             offline ? "Can't load runs while the engine is unreachable." : 'No runs yet. Click "Launch F1 run" to start one.'
@@ -199,7 +281,7 @@ export default function App() {
           busy={busy}
           fix={fixes[selected.run_id]}
           compare={compareFor(selected)}
-          onClose={() => setSelectedId(null)}
+          onClose={closeEvidence}
           onRerun={(id) => void rerunAndCompare(id)}
           onPropose={() => void propose(selected)}
         />
@@ -214,5 +296,18 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+export default function App() {
+  const surface = dashboardSurface(window.location.pathname)
+  if (surface === 'live') return <LiveDashboardApp />
+
+  return (
+    <main className="route-missing">
+      <h1>This DriftGuard page doesn&apos;t exist.</h1>
+      <p>Open the DriftGuard dashboard to view and run checks.</p>
+      <p><a href="/">Open dashboard</a></p>
+    </main>
   )
 }
