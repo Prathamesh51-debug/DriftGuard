@@ -111,10 +111,53 @@ def test_propose_with_llm_malformed_json_fallback():
 
 def test_export_scenario_fixtures(tmp_path):
     exported = export_scenario_fixtures(tmp_path)
-    assert len(exported) == 4
+    assert len(exported) == 7
     for p in exported:
         assert p.exists()
         raw = p.read_text(encoding="utf-8")
         parsed = Scenario.model_validate_json(raw)
         assert isinstance(parsed, Scenario)
+
+
+def test_generate_canonical_f6():
+    scenario = ScenarioGenerator.generate_f6()
+    assert scenario.scenario_id == "f6-webhook-replay-001"
+    assert scenario.fault == FaultType.F6_WEBHOOK_REPLAY
+    assert scenario.expect.captures_per_purchase == 1
+    assert scenario.inject.payload["mode"] == "duplicate"
+
+
+def test_generate_canonical_f7():
+    scenario = ScenarioGenerator.generate_f7()
+    assert scenario.scenario_id == "f7-prompt-injection-001"
+    assert scenario.fault == FaultType.F7_PROMPT_INJECTION
+    assert scenario.expect.no_refund_issued is True
+    assert scenario.inject.payload["attack_type"] == "direct_override"
+
+
+def test_generate_canonical_f5():
+    scenario = ScenarioGenerator.generate_f5()
+    assert scenario.scenario_id == "f5-money-math-001"
+    assert scenario.fault == FaultType.F5_MONEY_MATH_TRAP
+    assert scenario.expect.amount == "38.96"
+    assert scenario.expect.currency == "USD"
+    assert scenario.expect.captures_per_purchase == 1
+    assert scenario.inject.payload["expected_tax"] == "2.97"
+
+
+def test_calculate_expected_total_precision():
+    from ai.scenario_gen import calculate_expected_total
+    # USD: subtotal 35.99, tax 8.25%, discount 5.00
+    # 35.99 * 0.0825 = 2.969175 -> rounds to 2.97
+    # 35.99 + 2.97 - 5.00 = 33.96
+    total, tax, disc = calculate_expected_total("35.99", tax_rate="0.0825", discount="5.00", currency="USD")
+    assert total == "33.96"
+    assert tax == "2.97"
+    assert disc == "5.00"
+
+    # JPY: zero-decimal currency
+    total_jpy, tax_jpy, _ = calculate_expected_total("3500", tax_rate="0.10", currency="JPY")
+    assert total_jpy == "3850"
+    assert "." not in total_jpy
+
 
