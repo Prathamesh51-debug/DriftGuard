@@ -12,6 +12,8 @@
   --green-bg: #17301f;
   --amber: #f5b84b;
   --amber-bg: #3a2e14;
+  --row-hover: #1a212b;
+  --selected-row: #1e2a3a;
   color-scheme: dark;
 }
 

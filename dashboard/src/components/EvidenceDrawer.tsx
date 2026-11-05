@@ -111,9 +111,12 @@ export function EvidenceDrawer({
           <div className="eyebrow">Run {shortId(run.run_id)}</div>
           <h2 ref={headingRef} tabIndex={-1}>{faultLabel(scenario.fault)}</h2>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Close evidence drawer">
-          ✕
-        </button>
+        <div className="drawer-head-actions">
+          <a className="drawer-open-page" href={`/live/runs/${encodeURIComponent(run.run_id)}`}>Open full page</a>
+          <button className="icon-btn" onClick={onClose} aria-label="Close evidence drawer">
+            ✕
+          </button>
+        </div>
       </header>
 
       <div className="drawer-body">
