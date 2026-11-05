@@ -17,7 +17,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Open `http://localhost:5173/` for the API-backed dashboard. `/live` is an equivalent direct route.
+Open `http://localhost:5173/` for the landing page. The API-backed dashboard is at `/live`.
 
 To point at the real engine instead, set `VITE_API_URL` (default `http://localhost:8000`).
 `make up` starts Postgres and mitmproxy only; start the engine API separately with `make api`.

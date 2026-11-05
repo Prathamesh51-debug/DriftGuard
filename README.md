@@ -30,9 +30,9 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 
 ## Quick Start
 
-### Open the dashboard with fixture data
+### Open the frontend
 
-This starts the dashboard against the local mock API. It does not call PayPal or an LLM.
+The `/live` dashboard reads fixture data from the local mock API. This mode does not call PayPal or an LLM.
 
 1. Start the mock API from the repository root:
    ```bash
@@ -45,11 +45,11 @@ This starts the dashboard against the local mock API. It does not call PayPal or
    npm install
    npm run dev
    ```
-3. Open `http://localhost:5173/` for the API-backed dashboard. `/live` is an equivalent direct route.
+3. Open `http://localhost:5173/` for the landing page. Use **Open live dashboard** or go to `/live` to view runs and Ask Studio.
 
 ### Connect the real engine
 
-Copy `.env.example` to `.env` and configure the sandbox and model-provider credentials. `make up` starts Postgres and mitmproxy; it does not start the API or dashboard. Start the engine API separately with `make api`, then run the dashboard as above. The dashboard defaults to `http://localhost:8000`; set `VITE_API_URL` if the API is hosted elsewhere.
+Copy `.env.example` to `.env` and configure the sandbox and model-provider credentials. `make up` starts Postgres and mitmproxy; it does not start the API or frontend. Start the engine API separately with `make api`, then run the frontend as above. The live dashboard at `/live` defaults to `http://localhost:8000`; set `VITE_API_URL` if the API is hosted elsewhere.
 
 ## Repository Structure
 * `/engine` - The MITM proxy, deterministic reconciler, and API orchestrator.
