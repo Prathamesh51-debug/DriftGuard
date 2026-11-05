@@ -15,17 +15,32 @@ export interface DemoOrder {
   createdAt: string;
 }
 
+export interface DemoRefund {
+  refundId: string;
+  orderId: string;
+  amount: string;
+  createdAt: string;
+}
+
 export interface DemoShopState {
   appName: string;
   orders: DemoOrder[];
   totalOrdersCreated: number;
   totalCapturesRecorded: number;
   totalCapturedAmount: string;
+  totalRefundsIssued: number;
+  totalRefundAmount: string;
+  refunds: DemoRefund[];
+  webhookEventsProcessed: string[];
+  totalWebhooksProcessed: number;
   currency: string;
 }
 
 class StateStore {
   private orders: Map<string, DemoOrder> = new Map();
+  private processedWebhooks: Set<string> = new Set();
+  private webhookEvents: Array<{ eventId: string; eventType: string; timestamp: string; duplicate: boolean }> = [];
+  private refunds: DemoRefund[] = [];
 
   public recordOrder(orderId: string, amount: string = '38.97'): void {
     this.orders.set(orderId, {
@@ -47,6 +62,10 @@ class StateStore {
     }
   }
 
+  public getOrder(orderId: string): DemoOrder | undefined {
+    return this.orders.get(orderId);
+  }
+
   public recordCaptureSuccess(orderId: string, captureId?: string, amount: string = '38.97'): void {
     const order = this.orders.get(orderId);
     if (order) {
@@ -61,10 +80,36 @@ class StateStore {
     }
   }
 
+  public hasWebhookEvent(eventId: string): boolean {
+    return this.processedWebhooks.has(eventId);
+  }
+
+  public recordWebhookEvent(eventId: string, eventType: string, isDuplicate: boolean = false): void {
+    this.processedWebhooks.add(eventId);
+    this.webhookEvents.push({
+      eventId,
+      eventType,
+      timestamp: new Date().toISOString(),
+      duplicate: isDuplicate,
+    });
+  }
+
+  public recordRefund(orderId: string, refundId: string, amount: string): void {
+    this.refunds.push({
+      refundId,
+      orderId,
+      amount,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   public getState(): DemoShopState {
     const orderList = Array.from(this.orders.values());
     const totalCaptured = orderList
       .reduce((sum, o) => sum + parseFloat(o.capturedAmount), 0)
+      .toFixed(2);
+    const totalRefunded = this.refunds
+      .reduce((sum, r) => sum + parseFloat(r.amount), 0)
       .toFixed(2);
 
     return {
@@ -73,12 +118,20 @@ class StateStore {
       totalOrdersCreated: orderList.length,
       totalCapturesRecorded: orderList.reduce((sum, o) => sum + o.captureCount, 0),
       totalCapturedAmount: totalCaptured,
+      totalRefundsIssued: this.refunds.length,
+      totalRefundAmount: totalRefunded,
+      refunds: [...this.refunds],
+      webhookEventsProcessed: Array.from(this.processedWebhooks),
+      totalWebhooksProcessed: this.webhookEvents.length,
       currency: 'USD',
     };
   }
 
   public reset(): void {
     this.orders.clear();
+    this.processedWebhooks.clear();
+    this.webhookEvents = [];
+    this.refunds = [];
   }
 }
 

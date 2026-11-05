@@ -28,15 +28,59 @@ export interface CaptureResult {
   error?: string;
 }
 
+export interface OrderOptions {
+  currency?: string;
+  taxRate?: number;
+  discount?: string;
+}
+
+/**
+ * Calculates final purchase amount applying tax and discounts.
+ * SEEDED BUGS:
+ * - BUG-05: Floating point math precision error on sales tax (rounds down by $0.04).
+ * - BUG-06: Coupon discount subtraction mismatch (item total does not equal sum of unit prices).
+ * - BUG-07: Zero-decimal currency rounding error (fractional JPY/KRW).
+ */
+export function calculateOrderAmount(baseAmount: string, options?: OrderOptions): { finalAmount: string; currency: string } {
+  const currency = options?.currency || 'USD';
+  let finalAmount = baseAmount;
+
+  // BUG-05: Floating point math precision error on sales tax
+  if (options?.taxRate !== undefined) {
+    const subtotal = parseFloat(baseAmount);
+    const naiveTax = subtotal * options.taxRate;
+    // Buggy floating point calculation truncates cents and loses $0.04
+    const buggyTax = Math.floor((naiveTax - 0.04) * 100) / 100;
+    finalAmount = (subtotal + buggyTax).toFixed(2);
+  }
+
+  // BUG-06: Coupon discount subtraction mismatch
+  if (options?.discount !== undefined) {
+    const subtotal = parseFloat(baseAmount);
+    const discountVal = parseFloat(options.discount);
+    // Buggy discount calculation subtracts inconsistent amount
+    finalAmount = (subtotal - discountVal * 1.5).toFixed(2);
+  }
+
+  // BUG-07: Zero-decimal currency rounding error (JPY/KRW)
+  if ((currency === 'JPY' || currency === 'KRW') && finalAmount.includes('.')) {
+    // Buggy: fails to truncate or round fractional cents for 0-decimal currencies
+    finalAmount = finalAmount;
+  }
+
+  return { finalAmount, currency };
+}
+
 /**
  * Creates a PayPal v2 Checkout Order for $38.97 USD.
  * SEEDED BUGS:
  * - BUG-02: Blind retry loop on createOrder timeout without paypalRequestId.
  * - BUG-04: Random non-deterministic invoice ID.
  */
-export async function createCheckoutOrder(amount: string = '38.97'): Promise<CreateOrderResult> {
+export async function createCheckoutOrder(amount: string = '38.97', options?: OrderOptions): Promise<CreateOrderResult> {
   const returnUrl = process.env.PAYPAL_RETURN_URL || 'http://localhost:3000/return';
   const cancelUrl = process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/cancel';
+  const { finalAmount, currency } = calculateOrderAmount(amount, options);
 
   let attempts = 0;
   const maxRetries = 1;
@@ -55,8 +99,8 @@ export async function createCheckoutOrder(amount: string = '38.97'): Promise<Cre
               // BUG-04: Non-deterministic random invoice ID
               invoiceId: `INV-${Math.floor(Math.random() * 1000000)}`,
               amount: {
-                currencyCode: 'USD',
-                value: amount,
+                currencyCode: currency,
+                value: finalAmount,
               },
             },
           ],
@@ -75,7 +119,7 @@ export async function createCheckoutOrder(amount: string = '38.97'): Promise<Cre
       });
 
       const orderId = result.id || '';
-      shopState.recordOrder(orderId, amount);
+      shopState.recordOrder(orderId, finalAmount);
 
       const links = result.links || [];
       const approveLink = links.find((l: any) => l.rel === 'payer-action' || l.rel === 'approve');
@@ -84,7 +128,7 @@ export async function createCheckoutOrder(amount: string = '38.97'): Promise<Cre
       return {
         orderId,
         approveUrl,
-        amount,
+        amount: finalAmount,
       };
     } catch (err: any) {
       lastError = err;
@@ -127,7 +171,8 @@ export async function captureCheckoutOrder(orderId: string, maxRetries: number =
       const captureId = captures[0]?.id;
       const status = result.status || 'COMPLETED';
 
-      shopState.recordCaptureSuccess(orderId, captureId, '38.97');
+      const expectedAmt = shopState.getOrder(orderId)?.expectedAmount || '38.97';
+      shopState.recordCaptureSuccess(orderId, captureId, expectedAmt);
 
       return {
         success: true,

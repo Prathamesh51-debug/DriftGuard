@@ -3,6 +3,8 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createCheckoutOrder, captureCheckoutOrder } from './checkout';
+import { handleWebhook } from './webhooks';
+import { handleChat } from './assistant';
 import { shopState } from './state';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,7 +51,8 @@ app.post(['/_driftguard/reset', '/driftguard/reset'], (_req: Request, res: Respo
 app.post('/api/orders', async (req: Request, res: Response) => {
   try {
     const amount = req.body?.amount || '38.97';
-    const result = await createCheckoutOrder(amount);
+    const options = req.body?.options;
+    const result = await createCheckoutOrder(amount, options);
     res.status(201).json(result);
   } catch (error: any) {
     console.error('[DemoShop] Create order error:', error);
@@ -81,6 +84,18 @@ app.post('/api/orders/:id/capture', async (req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * Webhook Ingestion Endpoint
+ * Receives incoming PayPal notifications (BUG-08 unverified signature, BUG-09 duplicate replay).
+ */
+app.post('/api/webhooks', handleWebhook);
+
+/**
+ * AI Customer Support Chat Endpoint
+ * Evaluated by F7 prompt injection attacks (BUG-10 unauthorized refund bypass).
+ */
+app.post('/api/chat', handleChat);
 
 app.listen(port, () => {
   console.log(`[DemoShop] DriftGuard Demo Shop listening at http://localhost:${port}`);
