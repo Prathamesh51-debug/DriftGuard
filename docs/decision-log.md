@@ -279,5 +279,19 @@ Per `planner.md` (Part 7: Phase 2 Breadth), complete the Phase 2 Breadth gate: *
 5. **Reconciliation:** Reconciler queried live PayPal Ground Truth (1 capture, $38.97 USD) vs app state (0 captures recorded).
 6. **Deterministic Verdict:** `FAIL: invoice collision: random invoice ID broke deterministic ledger reconciliation`.
 
+---
+
+## [2026-11-05] Infrastructure Milestone: Render Cloud Deployment Blueprint & Worker Delivery
+- **Author:** Role A (Engine)
+- **Status:** APPROVED / IMPLEMENTED
+- **Deliverables:** `infra/render.yaml`, `render.yaml`, `engine/orchestrator/worker.py`
+- **Components Defined:**
+  1. **PostgreSQL Managed DB (`driftguard-db`):** Free-tier Postgres for persisting run history & concurrency-safe queue.
+  2. **FastAPI Engine API (`driftguard-engine`):** Python web service on port `$PORT` serving `/runs` & `/rerun` with health checks.
+  3. **Concurrency-Safe Worker (`driftguard-worker`):** Continuous worker pulling jobs using `SELECT ... FOR UPDATE SKIP LOCKED` with graceful signal shutdown.
+  4. **Dashboard Web Service (`driftguard-dashboard`):** Static site serving built React + Vite + AG Grid frontend.
+- **Context:** Completes the Thu 5 Nov infrastructure gate required before integration evening.
+
+
 
 
