@@ -1,0 +1,16 @@
+--- a/src/webhooks.ts
++++ b/src/webhooks.ts
+@@ -29,6 +29,13 @@
+   // BUG-08: Unverified webhook signature accepted
+   // Vulnerability: Missing verification against PayPal /v1/notifications/verify-webhook-signature
+   // Blindly returns true without checking cryptographic transmission signature headers
++  const sig = req.headers['paypal-transmission-sig'];
++  const certUrl = req.headers['paypal-cert-url'];
++  const authAlgo = req.headers['paypal-auth-algo'];
++  const transId = req.headers['paypal-transmission-id'];
++  if (!sig || !certUrl || !authAlgo || !transId) {
++    return false;
++  }
+   return true;
+ }
+ 

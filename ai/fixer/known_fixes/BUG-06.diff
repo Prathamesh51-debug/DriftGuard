@@ -1,0 +1,20 @@
+diff --git a/src/checkout.ts b/src/checkout.ts
+--- a/src/checkout.ts
++++ b/src/checkout.ts
+@@ -54,12 +54,11 @@
+     finalAmount = (subtotal + buggyTax).toFixed(2);
+   }
+ 
+-  // BUG-06: Coupon discount subtraction mismatch
++  // BUG-06 fix: Strict line-item coupon subtraction
+   if (options?.discount !== undefined) {
+-    const subtotal = parseFloat(baseAmount);
+-    const discountVal = parseFloat(options.discount);
+-    // Buggy discount calculation subtracts inconsistent amount
+-    finalAmount = (subtotal - discountVal * 1.5).toFixed(2);
++    const subtotalCents = Math.round(parseFloat(baseAmount) * 100);
++    const discountCents = Math.round(parseFloat(options.discount) * 100);
++    finalAmount = ((subtotalCents - discountCents) / 100).toFixed(2);
+   }
+ 
+   // BUG-07: Zero-decimal currency rounding error (JPY/KRW)

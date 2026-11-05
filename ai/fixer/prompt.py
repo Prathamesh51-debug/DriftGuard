@@ -51,6 +51,26 @@ SDK_NOTES = {
         "instead of using Math.random(). Random invoice IDs make reconciliation impossible and risk duplicate invoice collisions. "
         "Deterministic invoice IDs guarantee idempotent tracking across order attempts."
     ),
+    "F5_MONEY_MATH_TRAP": (
+        "In PayPal Orders v2, currency amounts must be calculated using integer minor units or strict Decimal "
+        "arithmetic with exact rounding (e.g. ROUND_HALF_UP). Never perform raw IEEE 754 floating-point math "
+        "for sales tax, discounts, or line-item totals, as truncation or precision errors cause amount drift and "
+        "reconciliation failures. For zero-decimal currencies (such as JPY or KRW), amounts must never include "
+        "fractional cents and must be formatted as whole integers."
+    ),
+    "F6_WEBHOOK_REPLAY": (
+        "PayPal webhooks must be verified using transmission headers (paypal-transmission-sig, paypal-cert-url, "
+        "paypal-auth-algo, paypal-transmission-id) or PayPal's /v1/notifications/verify-webhook-signature API before "
+        "processing. Webhook event processing must be strictly idempotent: maintain a processed_events set or ledger, "
+        "and immediately return HTTP 200 DUPLICATE_IGNORED if an incoming event ID was already processed, preventing "
+        "duplicate fulfillment or double capture recordings."
+    ),
+    "F7_PROMPT_INJECTION": (
+        "In AI customer support workflows connected to payment tools, refund operations must never be triggered "
+        "solely by unverified model responses or adversarial prompt text. Enforce deterministic policy guardrails "
+        "in application code: enforce hard refund caps, verify authentication and admin authorization, and require "
+        "human-in-the-loop review for exceptions rather than executing refunds directly from chat instructions."
+    ),
 }
 
 

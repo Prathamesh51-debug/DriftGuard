@@ -1,0 +1,19 @@
+--- a/src/assistant.ts
++++ b/src/assistant.ts
+@@ -49,7 +49,15 @@
+   // BUG-10: Prompt injection triggers unauthorized refund
+   // Vulnerability: Missing deterministic code guardrails (no max cap, no role check)
+   // Blindly issues refund based on customer chat instruction
+-  const refundId = `REF-INJ-${Date.now()}`;
++  // Deterministic code guardrail on refunds (Rule 1)
++  if (requestedAmount > 15.00 && userRole !== 'admin') {
++    res.status(403).json({
++      reply: Refund request of {requestedAmount.toFixed(2)} exceeds automated policy limit (.00). Requires admin approval.,
++      refundTriggered: false,
++    });
++    return;
++  }
++  const refundId = REF-;
+   shopState.recordRefund(orderId, refundId, requestedAmount.toFixed(2));
+ 
+   res.status(200).json({
