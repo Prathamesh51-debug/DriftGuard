@@ -1,0 +1,17 @@
+diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.ts
+--- a/targets/demo-shop/src/checkout.ts
++++ b/targets/demo-shop/src/checkout.ts
+@@ -62,10 +62,9 @@
+     finalAmount = (subtotal - discountVal * 1.5).toFixed(2);
+   }
+ 
+-  // BUG-07: Zero-decimal currency rounding error (JPY/KRW)
+-  if ((currency === 'JPY' || currency === 'KRW') && finalAmount.includes('.')) {
+-    // Buggy: fails to truncate or round fractional cents for 0-decimal currencies
+-    finalAmount = finalAmount;
++  // BUG-07 fix: Enforce zero-decimal integer formatting for JPY/KRW
++  if (currency === 'JPY' || currency === 'KRW') {
++    finalAmount = Math.round(parseFloat(finalAmount)).toString();
+   }
+ 
+   return { finalAmount, currency };

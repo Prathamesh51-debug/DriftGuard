@@ -1,7 +1,7 @@
 diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.ts
 --- a/targets/demo-shop/src/checkout.ts
 +++ b/targets/demo-shop/src/checkout.ts
-@@ -14,6 +14,7 @@
+@@ -12,6 +12,7 @@
  import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
  import { ordersController } from './paypal';
  import { shopState } from './state';
@@ -9,7 +9,7 @@ diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.
  
  export interface CreateOrderResult {
    orderId: string;
-@@ -110,6 +111,7 @@
+@@ -154,6 +155,7 @@
   * - BUG-03: Erroneously treats 422 INSTRUMENT_DECLINED as completed.
   */
  export async function captureCheckoutOrder(orderId: string, maxRetries: number = 2): Promise<CaptureResult> {
@@ -17,7 +17,7 @@ diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.
    let attempts = 0;
    let lastError: any = null;
    while (attempts <= maxRetries) {
-@@ -119,6 +121,7 @@
+@@ -163,6 +165,7 @@
        const { result } = await ordersController.captureOrder({
          id: orderId,
          prefer: 'return=representation',

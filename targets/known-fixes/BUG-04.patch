@@ -9,12 +9,12 @@ diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.
  
  export interface CreateOrderResult {
    orderId: string;
-@@ -53,7 +54,7 @@
+@@ -97,7 +98,7 @@
                referenceId: `cart-${Date.now()}`,
                description: 'Autonomous Agent Guardrails Subscription',
                // BUG-04: Non-deterministic random invoice ID
 -              invoiceId: `INV-${Math.floor(Math.random() * 1000000)}`,
 +              invoiceId: `INV-${crypto.createHash('sha256').update(`cart-${amount}`).digest('hex').substring(0, 16).toUpperCase()}`,
                amount: {
-                 currencyCode: 'USD',
-                 value: amount,
+                 currencyCode: currency,
+                 value: finalAmount,

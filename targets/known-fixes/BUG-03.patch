@@ -1,7 +1,7 @@
 diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.ts
 --- a/targets/demo-shop/src/checkout.ts
 +++ b/targets/demo-shop/src/checkout.ts
-@@ -141,13 +141,14 @@
+@@ -186,13 +186,14 @@
        const statusCode = err?.statusCode || err?.response?.status || 504;
  
        // BUG-03: Buggy handler assumes 422 INSTRUMENT_DECLINED means already paid/handled and records success!

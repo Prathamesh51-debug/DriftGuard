@@ -1,0 +1,21 @@
+diff --git a/targets/demo-shop/src/checkout.ts b/targets/demo-shop/src/checkout.ts
+--- a/targets/demo-shop/src/checkout.ts
++++ b/targets/demo-shop/src/checkout.ts
+@@ -45,13 +45,11 @@
+   const currency = options?.currency || 'USD';
+   let finalAmount = baseAmount;
+ 
+-  // BUG-05: Floating point math precision error on sales tax
++  // BUG-05 fix: Strict integer minor-units calculation prevents float rounding drift
+   if (options?.taxRate !== undefined) {
+-    const subtotal = parseFloat(baseAmount);
+-    const naiveTax = subtotal * options.taxRate;
+-    // Buggy floating point calculation truncates cents and loses $0.04
+-    const buggyTax = Math.floor((naiveTax - 0.04) * 100) / 100;
+-    finalAmount = (subtotal + buggyTax).toFixed(2);
++    const subtotalCents = Math.round(parseFloat(baseAmount) * 100);
++    const taxCents = Math.round(subtotalCents * options.taxRate);
++    finalAmount = ((subtotalCents + taxCents) / 100).toFixed(2);
+   }
+ 
+   // BUG-06: Coupon discount subtraction mismatch

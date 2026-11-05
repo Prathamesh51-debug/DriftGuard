@@ -1,0 +1,14 @@
+diff --git a/targets/demo-shop/src/webhooks.ts b/targets/demo-shop/src/webhooks.ts
+--- a/targets/demo-shop/src/webhooks.ts
++++ b/targets/demo-shop/src/webhooks.ts
+@@ -52,6 +52,10 @@
+   // BUG-09: Duplicate webhook event processing
+   // Vulnerability: Missing deduplication check against processed_events
+   // Replayed webhook events process multiple times without idempotency check
++  if (shopState.hasWebhookEvent(event.id)) {
++    res.status(200).json({ status: 'DUPLICATE_IGNORED', eventId: event.id });
++    return;
++  }
+   const isDuplicate = false;
+ 
+   shopState.recordWebhookEvent(event.id, event.event_type, isDuplicate);
