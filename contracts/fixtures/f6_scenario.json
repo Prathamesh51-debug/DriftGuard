@@ -1,0 +1,25 @@
+{
+  "scenario_id": "f6-webhook-replay-001",
+  "fault": "F6_WEBHOOK_REPLAY",
+  "description": "Replay duplicate PAYMENT.CAPTURE.COMPLETED webhook event to verify idempotent ledger processing",
+  "target_call": {
+    "file": "src/webhooks.ts",
+    "line": 55,
+    "method": "WebhooksController.handleWebhook"
+  },
+  "inject": {
+    "on": "POST /api/webhooks",
+    "action": "replay_event",
+    "payload": {
+      "mode": "duplicate",
+      "event_id": "WH-REPLAY-998877",
+      "order_id": "ORDER-F6-001",
+      "event_type": "PAYMENT.CAPTURE.COMPLETED"
+    }
+  },
+  "expect": {
+    "captures_per_purchase": 1,
+    "amount": "38.97",
+    "currency": "USD"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "scenario_id": "f6-webhook-replay-001",
+  "verdict": "PASS",
+  "rule": "captures_per_purchase == 1",
+  "observed": {
+    "captures": 1,
+    "amount_captured": "38.97",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "ORDER-F6-001"
+    ],
+    "paypal_capture_ids": [
+      "CAP-F6-REPLAY-001"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "proxy-log-f6-pass-001"
+    ],
+    "webhook_event_ids": [
+      "WH-REPLAY-998877"
+    ]
+  },
+  "money_impact": "0.00 USD (idempotent webhook replay properly ignored)"
+}
+

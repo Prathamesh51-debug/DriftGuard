@@ -1,0 +1,32 @@
+{
+  "scenario_id": "f6-webhook-replay-001",
+  "verdict": "FAIL",
+  "rule": "captures_per_purchase == 1",
+  "observed": {
+    "captures": 2,
+    "amount_captured": "77.94",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 2
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "ORDER-F6-001"
+    ],
+    "paypal_capture_ids": [
+      "CAP-F6-REPLAY-001",
+      "CAP-F6-REPLAY-002"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "proxy-log-f6-fail-001",
+      "proxy-log-f6-fail-002"
+    ],
+    "webhook_event_ids": [
+      "WH-REPLAY-998877",
+      "WH-REPLAY-998877"
+    ]
+  },
+  "money_impact": "buyer credited or charged twice via replayed webhook: +38.97 USD drift"
+}
+

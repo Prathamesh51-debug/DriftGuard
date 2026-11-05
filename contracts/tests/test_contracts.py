@@ -106,8 +106,8 @@ def test_invalid_line_number_rejected():
 
 
 def test_phase_2_breadth_fixtures():
-    """Validates that all Phase 2 fixtures (F2, F3, F4) conform strictly to contracts."""
-    for fault_key in ["f2", "f3", "f4"]:
+    """Validates that all Phase 2 fixtures (F2, F3, F4, F5, F6, F7) conform strictly to contracts."""
+    for fault_key in ["f2", "f3", "f4", "f5", "f6", "f7"]:
         scenario_file = FIXTURES_DIR / f"{fault_key}_scenario.json"
         assert scenario_file.exists(), f"Missing {scenario_file}"
         scenario = Scenario.model_validate_json(scenario_file.read_text(encoding="utf-8"))

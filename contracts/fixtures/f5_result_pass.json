@@ -1,0 +1,28 @@
+{
+  "scenario_id": "f5-money-math-001",
+  "verdict": "PASS",
+  "rule": "amount_captured == expected_amount",
+  "observed": {
+    "captures": 1,
+    "amount_captured": "38.96",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "3LM9120489X104921A"
+    ],
+    "paypal_capture_ids": [
+      "9BB2910485710294C"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "req_05f5math001"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "clean: captured exact expected amount (+38.96 USD)",
+  "error_message": null
+}
+
