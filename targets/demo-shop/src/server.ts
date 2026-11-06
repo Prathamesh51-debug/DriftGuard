@@ -50,8 +50,13 @@ app.post(['/_driftguard/reset', '/driftguard/reset'], (_req: Request, res: Respo
  */
 app.post('/api/orders', async (req: Request, res: Response) => {
   try {
-    const amount = req.body?.amount || '38.97';
-    const options = req.body?.options;
+    const amount = req.body?.amount || req.body?.subtotal || '38.97';
+    const rawTax = req.body?.options?.taxRate ?? req.body?.tax_rate;
+    const taxRate = rawTax !== undefined && rawTax !== null ? Number(rawTax) : undefined;
+    const rawDiscount = req.body?.options?.discount ?? req.body?.discount;
+    const discount = rawDiscount !== undefined && rawDiscount !== null ? String(rawDiscount) : undefined;
+    const currency = req.body?.options?.currency || req.body?.currency || 'USD';
+    const options = { taxRate, discount, currency };
     const result = await createCheckoutOrder(amount, options);
     res.status(201).json(result);
   } catch (error: any) {

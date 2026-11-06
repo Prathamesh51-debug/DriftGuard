@@ -44,16 +44,10 @@ def run_scenario(
             pass
 
     order_body: Dict[str, Any] = {"amount": order_amount}
-    if scenario.fault == FaultType.F5_MONEY_MATH_TRAP and scenario.inject and scenario.inject.payload:
-        subtotal = scenario.inject.payload.get("subtotal") or order_amount
-        options: Dict[str, Any] = {}
-        if scenario.inject.payload.get("tax_rate") is not None:
-            options["taxRate"] = float(scenario.inject.payload["tax_rate"])
-        if scenario.inject.payload.get("discount") is not None:
-            options["discount"] = str(scenario.inject.payload["discount"])
-        if scenario.expect.currency:
-            options["currency"] = scenario.expect.currency
-        order_body = {"amount": str(subtotal), "options": options}
+    if scenario.inject and scenario.inject.payload:
+        order_body.update(scenario.inject.payload)
+    if scenario.expect.currency:
+        order_body.setdefault("currency", scenario.expect.currency)
 
     try:
         res = requests.post(
