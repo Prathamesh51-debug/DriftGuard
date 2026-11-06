@@ -186,7 +186,11 @@ export async function captureCheckoutOrder(orderId: string, maxRetries: number =
       const statusCode = err?.statusCode || err?.response?.status || 504;
 
       // BUG-03: Buggy handler assumes 422 INSTRUMENT_DECLINED means already paid/handled and records success!
-      if (statusCode === 422) {
+      const errData = err?.result || err?.body || err?.message || err;
+      const errStr = typeof errData === 'string' ? errData : JSON.stringify(errData);
+      const isAlreadyCaptured = errStr.includes('ORDER_ALREADY_CAPTURED');
+
+      if (statusCode === 422 && !isAlreadyCaptured) {
         shopState.recordCaptureSuccess(orderId, undefined, '38.97');
         return {
           success: true,
