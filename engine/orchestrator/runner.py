@@ -3,6 +3,7 @@ DriftGuard Orchestrator: End-to-End Test Execution State Machine.
 Coordinates: Target App -> Headless Buyer Driver -> Chaos Proxy -> Reconciler.
 """
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,17 @@ from contracts import Evidence, FaultType, ObservedState, Result, Scenario, Verd
 from engine.reconciler import reconcile_order
 
 
+def set_active_proxy_fault(fault: str, logs_dir: Optional[Path] = None):
+    """Dynamically set the active fault for mitmproxy via the shared logs volume."""
+    path = (logs_dir or (ROOT_DIR / "logs")) / "active_fault.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"fault": fault.upper(), "timestamp": time.time()}), encoding="utf-8")
+        print(f"[ORCHESTRATOR] 0. Armed proxy fault: {fault.upper()}")
+    except Exception as e:
+        print(f"[ORCHESTRATOR] Warning: could not write active_fault.json: {e}")
+
+
 def run_scenario(
     scenario: Scenario,
     target_shop_url: str = "http://localhost:3001",
@@ -26,12 +38,17 @@ def run_scenario(
 ) -> Result:
     """
     Executes an end-to-end chaos test run on a target shop:
+    0. Dynamically arms chaos proxy with the scenario fault (no container restart required)
     1. Creates order on target shop (POST /api/orders)
     2. Approves order headlessly via Playwright (ai.buyer_driver)
     3. Triggers capture on target shop (POST /api/orders/:id/capture)
     4. Runs Reconciler to generate mathematically proven Result
     """
     shop_base = target_shop_url.rstrip("/")
+
+    # 0. Dynamically arm chaos proxy
+    fault_code = scenario.fault.value.split("_")[0].upper()
+    set_active_proxy_fault(fault_code)
 
     # 1. Create order on target shop
     print(f"\n[ORCHESTRATOR] 1. Creating order on {shop_base}/api/orders...")

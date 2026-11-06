@@ -34,6 +34,7 @@ from faults import (
 
 LOG_DIR = Path("/home/mitmproxy/logs")
 LOG_FILE = LOG_DIR / "proxy_traffic.jsonl"
+ACTIVE_FAULT_FILE = LOG_DIR / "active_fault.json"
 
 HANDLERS = {
     "F1": f1_lost_capture,
@@ -49,10 +50,24 @@ def _get_handler(fault: str):
 
 
 def _active_fault(flow: http.HTTPFlow) -> str:
-    """Return the active fault code (env var takes precedence, header overrides per-request)."""
+    """
+    Return the active fault code:
+    1. X-DriftGuard-Fault request header (per-request override)
+    2. Shared dynamic control file (/home/mitmproxy/logs/active_fault.json)
+    3. DRIFTGUARD_FAULT environment variable fallback
+    """
     header = flow.request.headers.get("X-DriftGuard-Fault", "").strip().upper()
     if header:
         return header
+    if ACTIVE_FAULT_FILE.exists():
+        try:
+            with open(ACTIVE_FAULT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                f_code = data.get("fault", "").strip().upper()
+                if f_code:
+                    return f_code
+        except Exception:
+            pass
     return os.getenv("DRIFTGUARD_FAULT", "").strip().upper()
 
 
