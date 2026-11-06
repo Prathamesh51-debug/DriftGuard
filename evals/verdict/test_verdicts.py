@@ -53,3 +53,32 @@ def test_zero_false_alarm_on_clean_order():
     )
     assert observed.app_recorded_captures == observed.captures
 
+
+def test_all_fixtures_reconcile_rules():
+    """Verify fault fixtures F1 through F5 pass schema validation and expected verdicts."""
+    for fault_key in ["f1", "f2", "f3", "f4", "f5"]:
+        scen = Scenario.model_validate_json((FIXTURES / f"{fault_key}_scenario.json").read_text(encoding="utf-8"))
+        res_fail = Result.model_validate_json((FIXTURES / f"{fault_key}_result_fail.json").read_text(encoding="utf-8"))
+        res_pass = Result.model_validate_json((FIXTURES / f"{fault_key}_result_pass.json").read_text(encoding="utf-8"))
+
+        assert res_fail.verdict == Verdict.FAIL
+        assert res_pass.verdict == Verdict.PASS
+        assert res_fail.scenario_id == scen.scenario_id
+        assert res_pass.scenario_id == scen.scenario_id
+
+
+def test_reconciler_f5_logic():
+    """Verify deterministic evaluation of F5 (money math precision drift)."""
+    from engine.reconciler.reconcile import _verdict_f5
+
+    s_f5 = Scenario.model_validate_json((FIXTURES / "f5_scenario.json").read_text(encoding="utf-8"))
+    v_fail, rule_f5, impact_f5, _ = _verdict_f5(s_f5, {"total_captured_amount": "38.92"}, None, "ord_1", ["ord_1"])
+    assert v_fail == Verdict.FAIL
+    assert "money math drift" in impact_f5
+
+    v_pass, _, impact_f5_pass, _ = _verdict_f5(s_f5, {"total_captured_amount": s_f5.expect.amount}, None, "ord_1", ["ord_1"])
+    assert v_pass == Verdict.PASS
+    assert "clean" in impact_f5_pass
+
+
+

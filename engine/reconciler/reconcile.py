@@ -13,6 +13,7 @@ Supported faults:
 
 import sys
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import requests
@@ -241,12 +242,44 @@ def _verdict_f4(
     return verdict, rule, money_impact, app_captures
 
 
+def _verdict_f5(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F5: Money Math Trap (fractional cent tax / coupon rounding).
+    FAIL when amount captured in PayPal diverges from scenario.expect.amount.
+    Safe = exact decimal match.
+    """
+    app_captures = extract_app_captures(app_state, order_id)
+    actual_amount = Decimal(ledger.get("total_captured_amount", "0.00"))
+    expected_amount = Decimal(scenario.expect.amount or "38.97")
+    rule = "amount_captured == expected_amount"
+
+    if actual_amount == expected_amount:
+        verdict = Verdict.PASS
+        money_impact = f"clean: captured exact expected amount (+{actual_amount:.2f} USD)"
+    else:
+        verdict = Verdict.FAIL
+        diff = actual_amount - expected_amount
+        money_impact = (
+            f"money math drift: expected {expected_amount:.2f} USD, got {actual_amount:.2f} "
+            f"({diff:+.2f} drift from floating-point tax rounding)"
+        )
+
+    return verdict, rule, money_impact, app_captures
+
+
 # Dispatch table: fault → verdict function
 _VERDICT_FNS = {
     FaultType.F1_LOST_CAPTURE_RESPONSE: _verdict_f1,
     FaultType.F2_SLOW_PAYPAL: _verdict_f2,
     FaultType.F3_FORCED_DECLINE: _verdict_f3,
     FaultType.F4_DUPLICATE_INVOICE: _verdict_f4,
+    FaultType.F5_MONEY_MATH_TRAP: _verdict_f5,
 }
 
 

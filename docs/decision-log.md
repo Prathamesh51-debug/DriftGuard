@@ -292,6 +292,33 @@ Per `planner.md` (Part 7: Phase 2 Breadth), complete the Phase 2 Breadth gate: *
   4. **Dashboard Web Service (`driftguard-dashboard`):** Static site serving built React + Vite + AG Grid frontend.
 - **Context:** Completes the Thu 5 Nov infrastructure gate required before integration evening.
 
+---
+
+## [2026-11-06] Integration Milestone: Fault F5 (Money Math Trap) Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID (PayPal Ground Truth):** `83N21585ND195201L`
+- **Real PayPal Capture ID:** `9WB42086K2230853J` ($38.91 USD)
+- **Expected Amount:** `$38.96 USD`
+- **Observed Amount:** `$38.91 USD` (-$0.05 tax rounding drift)
+- **Rule Evaluated:** `amount_captured == expected_amount`
+- **Verdict:** `FAIL`
+- **Money Impact:** `money math drift: expected 38.96 USD, got 38.91 (-0.05 drift from floating-point tax rounding)`
+
+### Context
+Per `planner.md` (Part 7 & Part 10: Fault Matrix), verify Fault F5 against `BUG-05` (floating-point precision / sales tax rounding truncation) on the Demo Shop.
+
+### Automated Sequence Observed
+1. **Target Order Creation:** Runner requested order with `subtotal: "35.99"` and `taxRate: 0.0825`.
+2. **BUG-05 Reproduction:** Demo shop's `calculateOrderAmount` truncated sales tax calculation with floating-point math, requesting `$38.91` instead of `$38.96`.
+3. **PayPal Order Creation:** PayPal Sandbox created Order `83N21585ND195201L` with requested value `$38.91 USD`.
+4. **Proxy Audit (F5 Addon):** `f5_money_math.py` logged order creation and tagged the audit flow for decimal reconciliation.
+5. **Headless Approval:** Playwright approved purchase in `20.49s`.
+6. **Capture:** Target shop captured Order `83N21585ND195201L` (`9WB42086K2230853J`, $38.91 USD).
+7. **Reconciliation:** Reconciler fetched live PayPal Ground Truth ($38.91 USD captured), compared against expected `$38.96 USD`, and mathematically computed the exact -$0.05 decimal drift.
+8. **Deterministic Verdict:** `FAIL: money math drift: expected 38.96 USD, got 38.91 (-0.05 drift from floating-point tax rounding)`.
+
+
 
 
 

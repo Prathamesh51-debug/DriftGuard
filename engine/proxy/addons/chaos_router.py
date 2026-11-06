@@ -24,7 +24,13 @@ import importlib
 from mitmproxy import ctx, http
 
 # Fault handler modules — imported and reloaded dynamically so changes take effect immediately
-from faults import f1_lost_capture, f2_slow_paypal, f3_forced_decline, f4_duplicate_invoice
+from faults import (
+    f1_lost_capture,
+    f2_slow_paypal,
+    f3_forced_decline,
+    f4_duplicate_invoice,
+    f5_money_math,
+)
 
 LOG_DIR = Path("/home/mitmproxy/logs")
 LOG_FILE = LOG_DIR / "proxy_traffic.jsonl"
@@ -34,6 +40,7 @@ HANDLERS = {
     "F2": f2_slow_paypal,
     "F3": f3_forced_decline,
     "F4": f4_duplicate_invoice,
+    "F5": f5_money_math,
 }
 
 

@@ -6,7 +6,7 @@ Coordinates: Target App -> Headless Buyer Driver -> Chaos Proxy -> Reconciler.
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 import requests
 
 # Ensure repo root is in Python path for module resolution
@@ -14,7 +14,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from contracts import Result, Scenario, Verdict, ObservedState, Evidence
+from contracts import Evidence, FaultType, ObservedState, Result, Scenario, Verdict
 from engine.reconciler import reconcile_order
 
 
@@ -43,10 +43,22 @@ def run_scenario(
         except ValueError:
             pass
 
+    order_body: Dict[str, Any] = {"amount": order_amount}
+    if scenario.fault == FaultType.F5_MONEY_MATH_TRAP and scenario.inject and scenario.inject.payload:
+        subtotal = scenario.inject.payload.get("subtotal") or order_amount
+        options: Dict[str, Any] = {}
+        if scenario.inject.payload.get("tax_rate") is not None:
+            options["taxRate"] = float(scenario.inject.payload["tax_rate"])
+        if scenario.inject.payload.get("discount") is not None:
+            options["discount"] = str(scenario.inject.payload["discount"])
+        if scenario.expect.currency:
+            options["currency"] = scenario.expect.currency
+        order_body = {"amount": str(subtotal), "options": options}
+
     try:
         res = requests.post(
             f"{shop_base}/api/orders",
-            json={"amount": order_amount},
+            json=order_body,
             timeout=15
         )
         if res.status_code not in (200, 201):
@@ -134,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fault",
         default=os.getenv("DRIFTGUARD_FAULT", "F1").upper(),
-        help="Fault type to run (F1, F2, F3, F4). Defaults to env DRIFTGUARD_FAULT or F1",
+        help="Fault type to run (F1, F2, F3, F4, F5). Defaults to env DRIFTGUARD_FAULT or F1",
     )
     args = parser.parse_args()
 
