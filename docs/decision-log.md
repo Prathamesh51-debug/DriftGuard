@@ -318,6 +318,31 @@ Per `planner.md` (Part 7 & Part 10: Fault Matrix), verify Fault F5 against `BUG-
 7. **Reconciliation:** Reconciler fetched live PayPal Ground Truth ($38.91 USD captured), compared against expected `$38.96 USD`, and mathematically computed the exact -$0.05 decimal drift.
 8. **Deterministic Verdict:** `FAIL: money math drift: expected 38.96 USD, got 38.91 (-0.05 drift from floating-point tax rounding)`.
 
+---
+
+## [2026-11-06] Integration Milestone: Fault F6 (Webhook Replay & Duplicate Processing) Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID (PayPal Ground Truth):** `8YL78456V5787742H`
+- **Real PayPal Capture ID:** `9T17542760099344B` ($38.97 USD)
+- **Webhook Event Replayed:** `WH-REPLAY-998877` (`PAYMENT.CAPTURE.COMPLETED`, replayed 2x)
+- **Rule Evaluated:** `captures_per_purchase == 1`
+- **Verdict:** `FAIL`
+- **Money Impact:** `buyer credited or charged twice via replayed webhook: +38.97 USD drift`
+
+### Context
+Per `planner.md` (Part 7 & Part 10: Fault Matrix), verify Fault F6 against `BUG-09` (missing webhook event deduplication / non-idempotent event processing) on the Demo Shop.
+
+### Automated Sequence Observed
+1. **Dynamic Proxy Arming:** Runner armed proxy for `F6` with zero container restart via `logs/active_fault.json`.
+2. **Target Order Creation & Approval:** Demo shop created PayPal Order `8YL78456V5787742H` ($38.97 USD). Playwright approved payment in `21.38s`.
+3. **Capture:** Target shop captured order via PayPal Sandbox (HTTP 200, Capture `9T17542760099344B`).
+4. **Active Injection Action (`replay_event`):** Orchestrator dispatched `POST_CAPTURE_ACTIONS["replay_event"]` using `ai.webhook_replayer.WebhookReplayer`, injecting the identical `PAYMENT.CAPTURE.COMPLETED` webhook twice to `POST /api/webhooks`.
+5. **BUG-09 Reproduction:** Demo shop processed both duplicate webhook deliveries without checking idempotency against processed events, double-recording captures in its internal ledger.
+6. **Reconciliation:** Reconciler queried live PayPal Ground Truth (1 capture, $38.97 USD) vs demo shop application state (double capture recorded).
+7. **Deterministic Verdict:** `FAIL: buyer credited or charged twice via replayed webhook: +38.97 USD drift`.
+
+
 
 
 

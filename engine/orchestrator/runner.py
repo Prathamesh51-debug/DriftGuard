@@ -30,6 +30,34 @@ def set_active_proxy_fault(fault: str, logs_dir: Optional[Path] = None):
         print(f"[ORCHESTRATOR] Warning: could not write active_fault.json: {e}")
 
 
+def _action_replay_event(scenario: Scenario, context: Dict[str, Any]) -> None:
+    """Action handler: executes webhook replay attack strictly driven by scenario contract."""
+    from ai.webhook_replayer import WebhookReplayer, build_webhook_payload
+
+    shop_base = context["shop_base"]
+    order_id = context.get("order_id", "ORDER-TEST-001")
+    payload_cfg = scenario.inject.payload or {} if scenario.inject else {}
+
+    replayer = WebhookReplayer(endpoint_url=f"{shop_base}/api/webhooks")
+    event_id = payload_cfg.get("event_id")
+    webhook_body = build_webhook_payload(
+        event_id=event_id,
+        order_id=order_id,
+        amount=scenario.expect.amount or "38.97",
+        currency=scenario.expect.currency or "USD",
+    )
+    count = payload_cfg.get("replay_count", 2)
+    print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {shop_base}/api/webhooks...")
+    replay_res = replayer.replay_duplicate(webhook_body, count=count)
+    print(f"[ORCHESTRATOR] Replayed webhook {webhook_body['id']} {count}x (HTTP {[r['status_code'] for r in replay_res]})")
+
+
+# Post-capture active injection registry — keyed strictly by scenario.inject.action
+POST_CAPTURE_ACTIONS = {
+    "replay_event": _action_replay_event,
+}
+
+
 def run_scenario(
     scenario: Scenario,
     target_shop_url: str = "http://localhost:3001",
@@ -138,7 +166,15 @@ def run_scenario(
     # Brief delay to let proxy write its audit log
     time.sleep(1)
 
-    # 4. Run Reconciler to produce final ground truth Result
+    # 4. Dispatch post-capture active injection action if specified by scenario contract
+    if scenario.inject and scenario.inject.action in POST_CAPTURE_ACTIONS:
+        action_fn = POST_CAPTURE_ACTIONS[scenario.inject.action]
+        try:
+            action_fn(scenario, {"shop_base": shop_base, "order_id": order_id})
+        except Exception as e:
+            print(f"[ORCHESTRATOR] Active injection action '{scenario.inject.action}' error: {e}")
+
+    # 5. Run Reconciler to produce final ground truth Result
     print(f"[ORCHESTRATOR] 4. Reconciling ground truth from PayPal records...")
     result = reconcile_order(
         scenario=scenario,
@@ -157,7 +193,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fault",
         default=os.getenv("DRIFTGUARD_FAULT", "F1").upper(),
-        help="Fault type to run (F1, F2, F3, F4, F5). Defaults to env DRIFTGUARD_FAULT or F1",
+        help="Fault type to run (F1, F2, F3, F4, F5, F6). Defaults to env DRIFTGUARD_FAULT or F1",
     )
     args = parser.parse_args()
 

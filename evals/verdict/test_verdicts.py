@@ -55,8 +55,8 @@ def test_zero_false_alarm_on_clean_order():
 
 
 def test_all_fixtures_reconcile_rules():
-    """Verify fault fixtures F1 through F5 pass schema validation and expected verdicts."""
-    for fault_key in ["f1", "f2", "f3", "f4", "f5"]:
+    """Verify fault fixtures F1 through F6 pass schema validation and expected verdicts."""
+    for fault_key in ["f1", "f2", "f3", "f4", "f5", "f6"]:
         scen = Scenario.model_validate_json((FIXTURES / f"{fault_key}_scenario.json").read_text(encoding="utf-8"))
         res_fail = Result.model_validate_json((FIXTURES / f"{fault_key}_result_fail.json").read_text(encoding="utf-8"))
         res_pass = Result.model_validate_json((FIXTURES / f"{fault_key}_result_pass.json").read_text(encoding="utf-8"))
@@ -79,6 +79,22 @@ def test_reconciler_f5_logic():
     v_pass, _, impact_f5_pass, _ = _verdict_f5(s_f5, {"total_captured_amount": s_f5.expect.amount}, None, "ord_1", ["ord_1"])
     assert v_pass == Verdict.PASS
     assert "clean" in impact_f5_pass
+
+
+def test_reconciler_f6_logic():
+    """Verify deterministic evaluation of F6 (webhook replay duplicate captures)."""
+    from engine.reconciler.reconcile import _verdict_f6
+
+    s_f6 = Scenario.model_validate_json((FIXTURES / "f6_scenario.json").read_text(encoding="utf-8"))
+    # Fail case: app recorded 2 captures for a single purchase
+    v_fail, rule_f6, impact_f6, _ = _verdict_f6(s_f6, {"captures": [{}]}, {"totalCapturesRecorded": 2}, "ord_1", ["ord_1"])
+    assert v_fail == Verdict.FAIL
+    assert "twice" in impact_f6
+
+    # Pass case: app properly deduplicated, exactly 1 capture
+    v_pass, _, impact_f6_pass, _ = _verdict_f6(s_f6, {"captures": [{}]}, {"totalCapturesRecorded": 1}, "ord_1", ["ord_1"])
+    assert v_pass == Verdict.PASS
+    assert "properly ignored" in impact_f6_pass
 
 
 

@@ -6,6 +6,7 @@ from . import f2_slow_paypal
 from . import f3_forced_decline
 from . import f4_duplicate_invoice
 from . import f5_money_math
+from . import f6_webhook_replay
 
 __all__ = [
     "f1_lost_capture",
@@ -13,5 +14,6 @@ __all__ = [
     "f3_forced_decline",
     "f4_duplicate_invoice",
     "f5_money_math",
+    "f6_webhook_replay",
 ]
 

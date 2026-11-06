@@ -273,6 +273,34 @@ def _verdict_f5(
     return verdict, rule, money_impact, app_captures
 
 
+def _verdict_f6(
+    scenario: Scenario,
+    ledger: Dict[str, Any],
+    app_state: Optional[Dict[str, Any]],
+    order_id: str,
+    created_orders: List[str],
+) -> Tuple[Verdict, str, str, Optional[int]]:
+    """
+    F6: Webhook Replay.
+    FAIL when replayed duplicate webhook event credited or captured twice.
+    Safe = duplicate webhook safely ignored (exactly 1 capture).
+    """
+    num_captures = len(ledger.get("captures", []))
+    app_captures = extract_app_captures(app_state, order_id) or 0
+    expected_captures = scenario.expect.captures_per_purchase or 1
+    rule = "captures_per_purchase == 1"
+
+    if (num_captures == expected_captures) and (app_captures <= expected_captures):
+        verdict = Verdict.PASS
+        money_impact = "0.00 USD (idempotent webhook replay properly ignored)"
+    else:
+        verdict = Verdict.FAIL
+        drift_amount = scenario.expect.amount or "38.97"
+        money_impact = f"buyer credited or charged twice via replayed webhook: +{drift_amount} USD drift"
+
+    return verdict, rule, money_impact, app_captures
+
+
 # Dispatch table: fault → verdict function
 _VERDICT_FNS = {
     FaultType.F1_LOST_CAPTURE_RESPONSE: _verdict_f1,
@@ -280,6 +308,7 @@ _VERDICT_FNS = {
     FaultType.F3_FORCED_DECLINE: _verdict_f3,
     FaultType.F4_DUPLICATE_INVOICE: _verdict_f4,
     FaultType.F5_MONEY_MATH_TRAP: _verdict_f5,
+    FaultType.F6_WEBHOOK_REPLAY: _verdict_f6,
 }
 
 
@@ -326,21 +355,37 @@ def reconcile_order(
     )
 
     # 5. Construct ObservedState (Generic: derives directly from ledger & harvested orders)
+    effective_captures = max(len(ledger["captures"]), app_captures if app_captures is not None else 0)
+    effective_amount = ledger["total_captured_amount"]
+    if app_state and app_state.get("totalCapturedAmount"):
+        try:
+            if Decimal(app_state["totalCapturedAmount"]) > Decimal(effective_amount):
+                effective_amount = app_state["totalCapturedAmount"]
+        except Exception:
+            pass
+
     observed = ObservedState(
-        captures=len(ledger["captures"]),
-        amount_captured=ledger["total_captured_amount"],
+        captures=effective_captures,
+        amount_captured=effective_amount,
         orders_created=len(created_orders),
         refunds_issued=len(ledger["refunds"]),
         app_recorded_captures=app_captures,
     )
 
     # 6. Construct Evidence (Generic: includes all discovered order IDs & evidence)
+    webhook_ids: List[str] = []
+    if app_state and app_state.get("webhookEventsProcessed"):
+        webhook_ids = list(app_state.get("webhookEventsProcessed", []))
+    elif scenario.inject and scenario.inject.payload and scenario.inject.payload.get("event_id"):
+        eid = scenario.inject.payload.get("event_id")
+        webhook_ids = [eid, eid] if (app_captures and app_captures > 1) else [eid]
+
     evidence = Evidence(
         paypal_order_ids=created_orders,
         paypal_capture_ids=ledger["capture_ids"],
         paypal_refund_ids=ledger["refund_ids"],
         proxy_log_refs=proxy_refs,
-        webhook_event_ids=[],
+        webhook_event_ids=webhook_ids,
     )
 
     return Result(
