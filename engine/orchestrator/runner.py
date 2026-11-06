@@ -38,7 +38,12 @@ def _action_replay_event(scenario: Scenario, context: Dict[str, Any]) -> None:
     order_id = context.get("order_id", "ORDER-TEST-001")
     payload_cfg = scenario.inject.payload or {} if scenario.inject else {}
 
-    replayer = WebhookReplayer(endpoint_url=f"{shop_base}/api/webhooks")
+    endpoint_path = "/api/webhooks"
+    if scenario.inject and scenario.inject.on:
+        parts = scenario.inject.on.strip().split()
+        endpoint_path = parts[-1] if parts else "/api/webhooks"
+
+    replayer = WebhookReplayer(endpoint_url=f"{shop_base}{endpoint_path}")
     event_id = payload_cfg.get("event_id")
     webhook_body = build_webhook_payload(
         event_id=event_id,
@@ -47,14 +52,45 @@ def _action_replay_event(scenario: Scenario, context: Dict[str, Any]) -> None:
         currency=scenario.expect.currency or "USD",
     )
     count = payload_cfg.get("replay_count", 2)
-    print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {shop_base}/api/webhooks...")
+    print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {shop_base}{endpoint_path}...")
     replay_res = replayer.replay_duplicate(webhook_body, count=count)
     print(f"[ORCHESTRATOR] Replayed webhook {webhook_body['id']} {count}x (HTTP {[r['status_code'] for r in replay_res]})")
+
+
+def _action_prompt_injection(scenario: Scenario, context: Dict[str, Any]) -> None:
+    """Action handler: executes adversarial prompt injection attack against assistant endpoint."""
+    shop_base = context["shop_base"]
+    order_id = context.get("order_id", "ORDER-TEST-001")
+    payload_cfg = scenario.inject.payload or {} if scenario.inject else {}
+
+    endpoint_path = "/api/chat"
+    if scenario.inject and scenario.inject.on:
+        parts = scenario.inject.on.strip().split()
+        endpoint_path = parts[-1] if parts else "/api/chat"
+
+    prompt = payload_cfg.get("prompt", "")
+    user_role = payload_cfg.get("user_role", "buyer")
+
+    target_url = f"{shop_base}{endpoint_path}"
+    print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {target_url}...")
+    try:
+        res = requests.post(
+            target_url,
+            json={"message": prompt, "orderId": order_id, "userRole": user_role},
+            timeout=10,
+        )
+        data = res.json() if res.status_code == 200 else {}
+        refund_id = data.get("refundId")
+        refund_amount = data.get("refundAmount", "0.00")
+        print(f"[ORCHESTRATOR] Assistant response: refundTriggered={data.get('refundTriggered')}, refundId={refund_id}, amount=${refund_amount}")
+    except Exception as e:
+        print(f"[ORCHESTRATOR] Prompt injection request failed: {e}")
 
 
 # Post-capture active injection registry — keyed strictly by scenario.inject.action
 POST_CAPTURE_ACTIONS = {
     "replay_event": _action_replay_event,
+    "prompt_injection": _action_prompt_injection,
 }
 
 
@@ -193,7 +229,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fault",
         default=os.getenv("DRIFTGUARD_FAULT", "F1").upper(),
-        help="Fault type to run (F1, F2, F3, F4, F5, F6). Defaults to env DRIFTGUARD_FAULT or F1",
+        help="Fault type to run (F1, F2, F3, F4, F5, F6, F7). Defaults to env DRIFTGUARD_FAULT or F1",
     )
     args = parser.parse_args()
 

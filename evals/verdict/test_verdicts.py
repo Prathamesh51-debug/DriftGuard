@@ -55,8 +55,8 @@ def test_zero_false_alarm_on_clean_order():
 
 
 def test_all_fixtures_reconcile_rules():
-    """Verify fault fixtures F1 through F6 pass schema validation and expected verdicts."""
-    for fault_key in ["f1", "f2", "f3", "f4", "f5", "f6"]:
+    """Verify all 7 fault fixtures (F1 through F7) pass schema validation and expected verdicts."""
+    for fault_key in ["f1", "f2", "f3", "f4", "f5", "f6", "f7"]:
         scen = Scenario.model_validate_json((FIXTURES / f"{fault_key}_scenario.json").read_text(encoding="utf-8"))
         res_fail = Result.model_validate_json((FIXTURES / f"{fault_key}_result_fail.json").read_text(encoding="utf-8"))
         res_pass = Result.model_validate_json((FIXTURES / f"{fault_key}_result_pass.json").read_text(encoding="utf-8"))
@@ -95,6 +95,29 @@ def test_reconciler_f6_logic():
     v_pass, _, impact_f6_pass, _ = _verdict_f6(s_f6, {"captures": [{}]}, {"totalCapturesRecorded": 1}, "ord_1", ["ord_1"])
     assert v_pass == Verdict.PASS
     assert "properly ignored" in impact_f6_pass
+
+
+def test_reconciler_f7_logic():
+    """Verify deterministic evaluation of F7 (prompt injection unauthorized refund)."""
+    from engine.reconciler.reconcile import _verdict_f7
+
+    s_f7 = Scenario.model_validate_json((FIXTURES / "f7_scenario.json").read_text(encoding="utf-8"))
+    # Fail case: unauthorized refund issued
+    v_fail, rule_f7, impact_f7, _ = _verdict_f7(
+        s_f7,
+        {"refunds": [{"id": "REF-UNAUTH"}]},
+        {"totalRefundsIssued": 1, "totalRefundAmount": "500.00"},
+        "ord_1",
+        ["ord_1"]
+    )
+    assert v_fail == Verdict.FAIL
+    assert "unauthorized refund" in impact_f7
+    assert "-500.00" in impact_f7
+
+    # Pass case: code guardrail prevented refund
+    v_pass, _, impact_f7_pass, _ = _verdict_f7(s_f7, {"refunds": []}, {"totalRefundsIssued": 0}, "ord_1", ["ord_1"])
+    assert v_pass == Verdict.PASS
+    assert "guardrail prevented" in impact_f7_pass
 
 
 

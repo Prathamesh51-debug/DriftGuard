@@ -31,6 +31,7 @@ from faults import (
     f4_duplicate_invoice,
     f5_money_math,
     f6_webhook_replay,
+    f7_prompt_injection,
 )
 
 LOG_DIR = Path("/home/mitmproxy/logs")
@@ -44,6 +45,7 @@ HANDLERS = {
     "F4": f4_duplicate_invoice,
     "F5": f5_money_math,
     "F6": f6_webhook_replay,
+    "F7": f7_prompt_injection,
 }
 
 
