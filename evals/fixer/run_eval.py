@@ -32,7 +32,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SHOP = ROOT / "targets" / "demo-shop"
 FIXTURES = ROOT / "contracts" / "fixtures"
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
-FIXTURES_BY_FAULT = {"F1_LOST_CAPTURE_RESPONSE": ("f1_scenario.json", "f1_result_fail.json")}
+FIXTURES_BY_FAULT = {
+    "F1_LOST_CAPTURE_RESPONSE": ("f1_scenario.json", "f1_result_fail.json"),
+    "F2_SLOW_PAYPAL": ("f2_scenario.json", "f2_result_fail.json"),
+    "F3_FORCED_DECLINE": ("f3_scenario.json", "f3_result_fail.json"),
+    "F4_DUPLICATE_INVOICE": ("f4_scenario.json", "f4_result_fail.json"),
+    "F6_WEBHOOK_REPLAY": ("f6_scenario.json", "f6_result_fail.json"),
+}
 
 
 HINT = re.compile(r"BUG-\d+|idempot|request-?id", re.IGNORECASE)

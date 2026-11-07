@@ -40,7 +40,65 @@ def check_bug_01(source: str) -> List[str]:
     return problems
 
 
-CHECKS: Dict[str, Callable[[str], List[str]]] = {"BUG-01": check_bug_01}
+def check_bug_03(source: str) -> List[str]:
+    """BUG-03: a 422 instrument decline must not be recorded as a successful capture."""
+    code = _strip_comments(source)
+    branch = re.search(
+        r"if\s*\(\s*statusCode\s*===\s*422\b[\s\S]*?(?=if\s*\(\s*statusCode\s*===\s*504\b)",
+        code,
+    )
+    if not branch:
+        return ["the 422 decline branch was not found"]
+
+    body = branch.group(0)
+    problems = []
+    if "shopState.recordCaptureSuccess" in body:
+        problems.append("the decline branch records a capture")
+    if not re.search(r"\bsuccess\s*:\s*false\b", body):
+        problems.append("the decline branch reports success")
+    if not re.search(r"\bstatus\s*:\s*['\"]FAILED['\"]", body):
+        problems.append("the decline branch does not return a failed status")
+    if not re.search(r"\berror\s*:\s*['\"][^'\"]*INSTRUMENT_DECLINED", body):
+        problems.append("the decline branch does not surface INSTRUMENT_DECLINED")
+    return problems
+
+
+def check_bug_09(source: str) -> List[str]:
+    """BUG-09: a previously processed webhook ID must short-circuit before side effects."""
+    code = _strip_comments(source)
+    guard = re.search(
+        r"if\s*\(\s*shopState\.hasWebhookEvent\s*\(\s*event\.id\s*\)\s*\)\s*\{",
+        code,
+    )
+    if not guard:
+        return ["the webhook deduplication guard was not found"]
+
+    body_start = guard.end()
+    return_at = code.find("return;", body_start)
+    if return_at < 0:
+        return ["the webhook deduplication guard does not return"]
+
+    duplicate_reply = code[body_start:return_at]
+    problems = []
+    if "DUPLICATE_IGNORED" not in duplicate_reply:
+        problems.append("the duplicate webhook is not acknowledged as ignored")
+    if "verifyWebhookSignature" not in code[:guard.start()]:
+        problems.append("webhook deduplication runs before signature verification")
+
+    guard_end = return_at + len("return;")
+    for operation in ("shopState.recordWebhookEvent", "shopState.recordCaptureSuccess"):
+        operation_at = code.find(operation)
+        if operation_at >= 0 and operation_at < guard_end:
+            problems.append("the webhook deduplication guard does not precede side effects")
+            break
+    return problems
+
+
+CHECKS: Dict[str, Callable[[str], List[str]]] = {
+    "BUG-01": check_bug_01,
+    "BUG-03": check_bug_03,
+    "BUG-09": check_bug_09,
+}
 
 
 def check_patched(bug_id: str, source: str) -> List[str]:

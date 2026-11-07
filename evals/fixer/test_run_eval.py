@@ -8,6 +8,8 @@ from evals.fixer.run_eval import evaluate, to_markdown
 
 ROOT = Path(__file__).resolve().parents[2]
 GOOD_DIFF = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
+GOOD_DIFF_03 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-03.diff").read_text(encoding="utf-8")
+GOOD_DIFF_09 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff").read_text(encoding="utf-8")
 
 
 def good_reply():
@@ -68,3 +70,17 @@ def test_blind_copy_drops_hint_comments_and_keeps_the_code(tmp_path):
     assert "BUG-01" in original and "BUG-01" not in blind
     assert "ordersController.captureOrder(" in blind  # the code itself is untouched
     assert (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8") == original  # the real shop is not modified
+
+
+def test_evaluates_bug_03_with_a_behavior_check():
+    reply = json.dumps({"diff": GOOD_DIFF_03, "explanation": "Keep declined orders unpaid"})
+    summary = evaluate("BUG-03", 1, lambda _: ScriptedLLM([reply]))
+    assert summary["checked"] is True
+    assert summary["correct"] == 1
+
+
+def test_evaluates_bug_09_with_f6_fixtures_and_a_behavior_check():
+    reply = json.dumps({"diff": GOOD_DIFF_09, "explanation": "Ignore duplicate webhook events"})
+    summary = evaluate("BUG-09", 1, lambda _: ScriptedLLM([reply]))
+    assert summary["checked"] is True
+    assert summary["correct"] == 1

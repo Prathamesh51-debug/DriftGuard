@@ -1,12 +1,12 @@
---- a/targets/demo-shop/src/checkout.ts
-+++ b/targets/demo-shop/src/checkout.ts
-@@ -190,13 +190,14 @@
-       const errStr = typeof errData === 'string' ? errData : JSON.stringify(errData);
+diff --git a/src/checkout.ts b/src/checkout.ts
+--- a/src/checkout.ts
++++ b/src/checkout.ts
+@@ -195,13 +195,13 @@
        const isAlreadyCaptured = errStr.includes('ORDER_ALREADY_CAPTURED');
  
-+      // BUG-03 fix: Do not treat 422 INSTRUMENT_DECLINED as completed
-       if (statusCode === 422 && !isAlreadyCaptured) {
+-      if (statusCode === 422 && !isAlreadyCaptured) {
 -        shopState.recordCaptureSuccess(orderId, undefined, '38.97');
++      if (statusCode === 422 && !isAlreadyCaptured) {
          return {
 -          success: true,
 +          success: false,
@@ -17,4 +17,3 @@
 +          error: 'INSTRUMENT_DECLINED',
          };
        }
- 
