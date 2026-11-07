@@ -35,11 +35,11 @@ SDK_NOTES = {
     ),
     "F2_SLOW_PAYPAL": (
         "ordersController.createOrder({ body, prefer, paypalRequestId }) accepts paypalRequestId, which is "
-        "sent as the PayPal-Request-Id header. When network timeouts or delays occur, retrying with the same "
-        "deterministic paypalRequestId ensures PayPal idempotency: PayPal returns the existing order instead of "
-        "creating duplicate orders. Derive paypalRequestId deterministically from the order parameters (for example "
-        "crypto.createHash('sha256').update(`create-${amount}`).digest('hex')). Without it, a retry on timeout creates "
-        "multiple unlinked orders in PayPal."
+        "sent as the PayPal-Request-Id header. Generate one unique paypalRequestId with randomUUID() for each "
+        "createCheckoutOrder call, before its retry loop, and reuse it for every attempt. Do not derive it from amount: "
+        "separate purchases can have the same amount. Keep the order payload identical across attempts too: compute "
+        "referenceId and invoiceId once before the loop, then reuse those values inside each createOrder body. Keep "
+        "invoiceId random for a new checkout so this F2 fix does not change the separate BUG-04 behavior."
     ),
     "F3_FORCED_DECLINE": (
         "When ordersController.captureOrder returns HTTP 422 INSTRUMENT_DECLINED, the buyer's payment method was declined "

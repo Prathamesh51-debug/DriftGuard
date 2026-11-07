@@ -5,23 +5,39 @@ diff --git a/src/checkout.ts b/src/checkout.ts
  import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
  import { ordersController } from './paypal';
  import { shopState } from './state';
-+import crypto from 'crypto';
++import { randomUUID } from 'crypto';
  
  export interface CreateOrderResult {
    orderId: string;
-@@ -80,6 +81,7 @@
- export async function createCheckoutOrder(amount: string = '38.97', options?: OrderOptions): Promise<CreateOrderResult> {
+@@ -81,6 +82,9 @@
    const returnUrl = process.env.PAYPAL_RETURN_URL || 'http://localhost:3000/return';
    const cancelUrl = process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/cancel';
-+  const paypalRequestId = crypto.createHash('sha256').update(`create-${amount}`).digest('hex');
    const { finalAmount, currency } = calculateOrderAmount(amount, options);
++  const paypalRequestId = randomUUID();
++  const referenceId = `cart-${Date.now()}`;
++  const invoiceId = `INV-${Math.floor(Math.random() * 1000000)}`;
  
    let attempts = 0;
-@@ -115,6 +117,7 @@
+   const maxRetries = 1;
+@@ -94,10 +98,10 @@
+           intent: CheckoutPaymentIntent.Capture,
+           purchaseUnits: [
+             {
+-              referenceId: `cart-${Date.now()}`,
++              referenceId,
+               description: 'Autonomous Agent Guardrails Subscription',
+               // BUG-04: Non-deterministic random invoice ID
+-              invoiceId: `INV-${Math.floor(Math.random() * 1000000)}`,
++              invoiceId,
+               amount: {
+                 currencyCode: currency,
+                 value: finalAmount,
+@@ -115,7 +119,7 @@
            },
          },
          prefer: 'return=representation',
+-        // BUG-02: Missing paypalRequestId (idempotency key)!
 +        paypalRequestId,
-         // BUG-02: Missing paypalRequestId (idempotency key)!
        });
  
+       const orderId = result.id || '';

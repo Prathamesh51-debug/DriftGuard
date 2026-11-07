@@ -7,14 +7,76 @@ import pytest
 from ai.fixer import apply_to_copy
 from ai.fixer.bugs import known_fix_candidates
 from ai.fixer.patcher import normalize_diff
-from evals.fixer.checks import check_patched
+from evals.fixer.checks import CHECKS, check_patched
 
 ROOT = Path(__file__).resolve().parents[2]
 SHOP = ROOT / "targets" / "demo-shop"
 GOOD_DIFF = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
+GOOD_DIFF_02 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-02.diff").read_text(encoding="utf-8")
 GOOD_DIFF_03 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-03.diff").read_text(encoding="utf-8")
 GOOD_DIFF_09 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff").read_text(encoding="utf-8")
 ID_EXPRESSION = "createHash('sha256').update(`capture-${orderId}`).digest('hex')"
+
+SAFE_F2_SOURCE = """
+import { randomUUID } from 'crypto';
+export async function createCheckoutOrder() {
+  const paypalRequestId = randomUUID();
+  const referenceId = `cart-${Date.now()}`;
+  const invoiceId = `INV-${Math.random()}`;
+  let attempts = 0;
+  while (attempts <= 1) {
+    attempts += 1;
+    await ordersController.createOrder({ body: { purchaseUnits: [{ referenceId, invoiceId }] }, prefer: 'return=representation', paypalRequestId });
+  }
+}
+"""
+
+
+def _bug_02_problems(source):
+    checker = CHECKS.get("BUG-02")
+    return checker(source) if checker else ["BUG-02 behavioral check is missing"]
+
+
+def test_bug_02_original_create_order_fails_without_request_id():
+    original = (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8")
+    assert _bug_02_problems(original) == ["createOrder is still called without paypalRequestId"]
+
+
+def test_bug_02_rejects_an_amount_only_idempotency_key():
+    unsafe = SAFE_F2_SOURCE.replace("randomUUID()", "createHash('sha256').update(`create-${amount}`).digest('hex')")
+    assert any("request ID must be unique per purchase" in p for p in _bug_02_problems(unsafe))
+
+
+def test_bug_02_bundled_patch_reuses_stable_request_fields(tmp_path):
+    patched = (apply_to_copy(GOOD_DIFF_02, SHOP, tmp_path / "bug02-bundled") / "src" / "checkout.ts").read_text(encoding="utf-8")
+    assert check_patched("BUG-02", patched) == []
+
+
+def test_bug_02_accepts_one_unique_request_id_and_body_for_all_retries():
+    assert _bug_02_problems(SAFE_F2_SOURCE) == []
+
+
+def test_bug_02_rejects_literal_key_even_when_safe_variable_exists():
+    unsafe = SAFE_F2_SOURCE.replace("prefer: 'return=representation', paypalRequestId", "prefer: 'return=representation', paypalRequestId: 'shared'")
+    assert _bug_02_problems(unsafe)
+
+
+def test_bug_02_rejects_request_id_replaced_by_function_call():
+    unsafe = SAFE_F2_SOURCE.replace("prefer: 'return=representation', paypalRequestId", "prefer: 'return=representation', paypalRequestId: randomUUID()")
+    assert _bug_02_problems(unsafe)
+
+
+def test_bug_02_rejects_request_id_generated_inside_retry_loop():
+    unsafe = SAFE_F2_SOURCE.replace("  const paypalRequestId = randomUUID();\n", "")
+    unsafe = unsafe.replace("  while (attempts <= 1) {\n", "  while (attempts <= 1) {\n    const paypalRequestId = randomUUID();\n")
+    assert any("created once before the retry loop" in p for p in _bug_02_problems(unsafe))
+
+
+def test_bug_02_rejects_reference_and_invoice_ids_regenerated_inside_retry_loop():
+    unsafe = SAFE_F2_SOURCE.replace("  const referenceId = `cart-${Date.now()}`;\n", "")
+    unsafe = unsafe.replace("  const invoiceId = `INV-${Math.random()}`;\n", "")
+    unsafe = unsafe.replace("[{ referenceId, invoiceId }]", "[{ referenceId: `cart-${Date.now()}`, invoiceId: `INV-${Math.random()}` }]")
+    assert any("same order body on every retry" in p for p in _bug_02_problems(unsafe))
 
 
 @pytest.fixture
@@ -67,7 +129,7 @@ def test_a_differently_named_variable_is_followed(patched):
 
 def test_bugs_without_a_check_are_reported_as_such(patched):
     with pytest.raises(KeyError):
-        check_patched("BUG-02", patched)
+        check_patched("BUG-04", patched)
 
 
 def test_bug_03_curated_fix_keeps_declined_order_unpaid(tmp_path):

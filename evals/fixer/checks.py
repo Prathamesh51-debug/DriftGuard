@@ -69,6 +69,60 @@ def check_bug_01(source: str) -> List[str]:
     return problems
 
 
+def check_bug_02(source: str) -> List[str]:
+    """BUG-02: reuse one per-purchase request ID and identical order fields across retries."""
+    code = _strip_comments(source)
+    handler = re.search(r"export\s+async\s+function\s+createCheckoutOrder\s*\(", code)
+    if not handler:
+        return ["the order-creation handler was not found"]
+    create_code = re.split(r"\nexport\s+(?:async\s+)?function\s+", code[handler.end():], maxsplit=1)[0]
+    call = re.search(r"ordersController\.createOrder\s*\(\s*\{([\s\S]*?)\}\s*\)", create_code)
+    if not call:
+        return ["the createOrder call was not found"]
+
+    args = call.group(1)
+    field = re.search(r"\bpaypalRequestId\b(?:\s*:\s*([^,}\n]+))?", args)
+    if not field:
+        return ["createOrder is still called without paypalRequestId"]
+
+    request_id = (field.group(1) or "paypalRequestId").strip()
+    if not re.fullmatch(r"[A-Za-z_$][\w$]*", request_id):
+        return ["the request ID must be a per-purchase variable reused across retries"]
+    key_decl = re.search(
+        rf"\bconst\s+{re.escape(request_id)}\s*=\s*((?:crypto\.)?randomUUID\s*\(\s*\)|[^;]+);",
+        create_code,
+    )
+    loop = re.search(r"\bwhile\s*\([^)]*\battempts\b[^)]*\)\s*\{", create_code)
+    problems = []
+    if not key_decl:
+        problems.append("the request ID must be unique per purchase; do not derive it from amount alone")
+    else:
+        if not re.fullmatch(r"(?:crypto\.)?randomUUID\s*\(\s*\)", key_decl.group(1).strip()):
+            problems.append("the request ID must be unique per purchase; do not derive it from amount alone")
+        if loop and key_decl.start() > loop.start():
+            problems.append("the request ID must be created once before the retry loop")
+
+    body_decl = re.search(r"\bconst\s+body\s*=\s*\{", create_code)
+    uses_body_variable = bool(re.search(r"\bbody\s*(?:,|\})", args))
+    stable_body = bool(body_decl and loop and body_decl.start() < loop.start() and uses_body_variable)
+    if not stable_body:
+        if not loop:
+            problems.append("the retry loop was not found")
+        else:
+            for field_name in ("referenceId", "invoiceId"):
+                value = re.search(rf"\b{field_name}\s*:\s*([A-Za-z_$][\w$]*)\b", args)
+                shorthand = re.search(rf"(?<![\w$]){field_name}(?![\w$])(?=\s*[,}}])", args)
+                variable = value.group(1) if value else (field_name if shorthand else None)
+                declaration = (
+                    re.search(rf"\bconst\s+{re.escape(variable)}\s*=\s*[^;]+;", create_code)
+                    if variable else None
+                )
+                if not declaration or declaration.start() > loop.start():
+                    problems.append("referenceId and invoiceId must keep the same order body on every retry")
+                    break
+    return problems
+
+
 def check_bug_03(source: str) -> List[str]:
     """BUG-03: a 422 instrument decline must not be recorded as a successful capture."""
     code = _strip_comments(source)
@@ -199,6 +253,7 @@ def check_bug_09(source: str) -> List[str]:
 
 CHECKS: Dict[str, Callable[[str], List[str]]] = {
     "BUG-01": check_bug_01,
+    "BUG-02": check_bug_02,
     "BUG-03": check_bug_03,
     "BUG-09": check_bug_09,
 }

@@ -1,0 +1,28 @@
+{
+  "scenario_id": "f2-order-timeout-001",
+  "verdict": "FAIL",
+  "rule": "orders_created == 1",
+  "observed": {
+    "captures": 1,
+    "amount_captured": "38.97",
+    "orders_created": 2,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "80X35732P55256529",
+      "76L87672MM062444L"
+    ],
+    "paypal_capture_ids": [
+      "1VF296521J0818601"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "hash_e3b0c44298fc"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "duplicate orders: 2 orders created in PayPal for single purchase without idempotency key",
+  "error_message": null
+}

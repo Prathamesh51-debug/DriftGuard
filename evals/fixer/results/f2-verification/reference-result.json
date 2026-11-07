@@ -1,0 +1,27 @@
+{
+  "scenario_id": "f2-order-timeout-001",
+  "verdict": "PASS",
+  "rule": "orders_created == 1",
+  "observed": {
+    "captures": 1,
+    "amount_captured": "38.97",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "3LP638034S8744902"
+    ],
+    "paypal_capture_ids": [
+      "8X2037865V1992622"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "hash_e3b0c44298fc"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "clean: idempotent order creation prevented duplicate PayPal orders",
+  "error_message": null
+}
