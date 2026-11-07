@@ -14,7 +14,7 @@ SHOP = ROOT / "targets" / "demo-shop"
 GOOD_DIFF = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
 GOOD_DIFF_03 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-03.diff").read_text(encoding="utf-8")
 GOOD_DIFF_09 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff").read_text(encoding="utf-8")
-ID_EXPRESSION = "crypto.createHash('sha256').update(`capture-${orderId}`).digest('hex')"
+ID_EXPRESSION = "createHash('sha256').update(`capture-${orderId}`).digest('hex')"
 
 
 @pytest.fixture
@@ -24,6 +24,11 @@ def patched(tmp_path):
 
 def test_the_curated_fix_passes(patched):
     assert check_patched("BUG-01", patched) == []
+
+
+def test_the_curated_fix_checks_paypal_order_state_before_retry(patched):
+    assert "ordersController.getOrder" in patched
+    assert "payments?.captures" in patched
 
 
 def test_the_unfixed_shop_fails():
@@ -43,6 +48,16 @@ def test_a_request_id_not_tied_to_the_order_fails(patched):
 
 def test_a_commented_out_request_id_does_not_count(patched):
     assert check_patched("BUG-01", patched.replace("        paypalRequestId,\n", "        // paypalRequestId,\n"))
+
+
+def test_idempotency_key_alone_does_not_recover_a_lost_capture_response():
+    original = (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8")
+    key_only = original.replace(
+        "        // BUG-01: Missing paypalRequestId (idempotency key)!\n",
+        "        paypalRequestId: `capture-${orderId}`,\n",
+    )
+    problems = check_patched("BUG-01", key_only)
+    assert any("check PayPal order status after an ambiguous capture error" in problem for problem in problems)
 
 
 def test_a_differently_named_variable_is_followed(patched):
@@ -77,9 +92,29 @@ def test_bug_03_original_and_false_success_are_rejected(tmp_path):
     assert any("reports success" in problem for problem in check_patched("BUG-03", bad_checkout))
 
 
+def test_bug_03_accepts_removing_false_special_case_when_error_returns_failure():
+    original = (SHOP / "src" / "checkout.ts").read_text(encoding="utf-8")
+    start = original.index("      const errData =")
+    end = original.index("      // On 504", start)
+    safe_fallback = original[:start] + original[end:]
+    assert check_patched("BUG-03", safe_fallback) == []
+
+
 def test_bug_09_curated_fix_ignores_replayed_event_before_processing(tmp_path):
     patched_webhooks = (apply_to_copy(GOOD_DIFF_09, SHOP, tmp_path / "bug09") / "src" / "webhooks.ts").read_text(encoding="utf-8")
     assert check_patched("BUG-09", patched_webhooks) == []
+
+
+def test_bug_09_requires_capture_side_effect_to_be_idempotent_with_checkout(tmp_path):
+    patched_webhooks = (apply_to_copy(GOOD_DIFF_09, SHOP, tmp_path / "bug09-order") / "src" / "webhooks.ts").read_text(encoding="utf-8")
+    unguarded = patched_webhooks.replace(
+        "    if ((shopState.getOrder(orderId)?.captureCount || 0) === 0) {\n"
+        "      shopState.recordCaptureSuccess(orderId, captureId, amount);\n"
+        "    }",
+        "    shopState.recordCaptureSuccess(orderId, captureId, amount);",
+    )
+    problems = check_patched("BUG-09", unguarded)
+    assert any("already recorded by checkout" in problem for problem in problems)
 
 
 def test_preferred_bug_09_patch_applies_to_current_shop(tmp_path):
@@ -107,3 +142,28 @@ def test_bug_09_guard_after_event_recording_is_rejected(tmp_path):
     record_end = without_guard.index(record_line) + len(record_line)
     bad_order = without_guard[:record_end] + "\n" + guard + without_guard[record_end:]
     assert any("does not precede side effects" in problem for problem in check_patched("BUG-09", bad_order))
+
+
+def test_bug_09_accepts_a_persistent_set_deduplication_strategy():
+    model_style = (SHOP / "src" / "webhooks.ts").read_text(encoding="utf-8")
+    model_style = model_style.replace(
+        "export async function handleWebhook",
+        "const processedEvents = new Set<string>();\n\nexport async function handleWebhook",
+    )
+    model_style = model_style.replace(
+        "  const isDuplicate = false;\n\n  shopState.recordWebhookEvent(event.id, event.event_type, isDuplicate);",
+        "  const isDuplicate = processedEvents.has(event.id);\n"
+        "  if (isDuplicate) {\n"
+        "    res.status(200).json({ status: 'DUPLICATE_IGNORED', eventId: event.id });\n"
+        "    return;\n"
+        "  }\n"
+        "  processedEvents.add(event.id);\n\n"
+        "  shopState.recordWebhookEvent(event.id, event.event_type, isDuplicate);",
+    )
+    model_style = model_style.replace(
+        "    shopState.recordCaptureSuccess(orderId, captureId, amount);",
+        "    if ((shopState.getOrder(orderId)?.captureCount || 0) === 0) {\n"
+        "      shopState.recordCaptureSuccess(orderId, captureId, amount);\n"
+        "    }",
+    )
+    assert check_patched("BUG-09", model_style) == []

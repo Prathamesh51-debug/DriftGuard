@@ -45,10 +45,11 @@ def test_good_diff_is_accepted_and_applies_to_a_copy_only(failing, scenario, bug
 
     assert proposal.applies and proposal.source == "llm" and proposal.attempts == 1
     assert proposal.files == ["src/checkout.ts"]
-    assert proposal.lines_changed == 3
+    assert proposal.lines_changed > 3
 
     patched = apply_to_copy(proposal.diff, SHOP, tmp_path / "patched")
     assert "paypalRequestId," in (patched / bug.file).read_text(encoding="utf-8")
+    assert "ordersController.getOrder" in (patched / bug.file).read_text(encoding="utf-8")
     assert (SHOP / bug.file).read_text(encoding="utf-8") == original
 
 
@@ -141,9 +142,38 @@ def test_a_bundled_curated_fix_exists_for_bug_01():
     assert any(p.name == "BUG-01.diff" for p in known_fix_candidates("BUG-01"))
 
 
+def test_verified_role_c_bug_01_patch_is_the_first_fallback_candidate():
+    from ai.fixer import known_fix_candidates
+
+    assert known_fix_candidates("BUG-01")[0] == KNOWN_FIX
+
+
+def test_role_c_bug_09_patch_is_the_first_fallback_candidate():
+    from ai.fixer import known_fix_candidates
+
+    expected = ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff"
+    assert known_fix_candidates("BUG-09")[0] == expected
+
+
 def test_the_app_record_is_in_the_fixer_prompt(failing, scenario, bug):
     from ai.fixer.prompt import build_user_prompt
 
     prompt = build_user_prompt(failing, scenario, bug, "source")
     assert "The app's own records show 0 capture(s)." in prompt
-    assert "ORDER_ALREADY_CAPTURED" in prompt  # the SDK notes explain why the same request id fixes it
+    assert "ordersController.getOrder" in prompt
+
+
+def test_bug_01_sdk_guidance_checks_paypal_state_after_timeout():
+    from ai.fixer.prompt import SDK_NOTES
+
+    notes = SDK_NOTES["F1_LOST_CAPTURE_RESPONSE"]
+    assert "ordersController.getOrder({ id: orderId })" in notes
+    assert "COMPLETED capture" in notes
+
+
+def test_bug_09_guidance_prevents_duplicate_effects_across_checkout_and_webhook():
+    from ai.fixer.prompt import SDK_NOTES
+
+    notes = SDK_NOTES["F6_WEBHOOK_REPLAY"]
+    assert "shopState.hasWebhookEvent(event.id)" in notes
+    assert "captureCount" in notes

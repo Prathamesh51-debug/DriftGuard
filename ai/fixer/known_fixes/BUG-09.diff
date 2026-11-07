@@ -1,13 +1,31 @@
+diff --git a/src/webhooks.ts b/src/webhooks.ts
+index 6810abe..c7f7ba0 100644
 --- a/src/webhooks.ts
 +++ b/src/webhooks.ts
-@@ -52,6 +52,10 @@
-   // BUG-09: Duplicate webhook event processing
-   // Vulnerability: Missing deduplication check against processed_events
-   // Replayed webhook events process multiple times without idempotency check
+@@ -49,9 +49,12 @@ export async function handleWebhook(req: Request, res: Response): Promise<void>
+     return;
+   }
+ 
+-  // BUG-09: Duplicate webhook event processing
+-  // Vulnerability: Missing deduplication check against processed_events
+-  // Replayed webhook events process multiple times without idempotency check
++  // Ignore a replayed event before it can repeat ledger side effects.
 +  if (shopState.hasWebhookEvent(event.id)) {
-+    res.status(200).json({ status: 'DUPLICATE_IGNORED', eventId: event.id });
++    res.status(200).json({ status: 'DUPLICATE_IGNORED', eventId: event.id, eventType: event.event_type, duplicate: true });
 +    return;
 +  }
++
    const isDuplicate = false;
  
    shopState.recordWebhookEvent(event.id, event.event_type, isDuplicate);
+@@ -61,7 +64,9 @@ export async function handleWebhook(req: Request, res: Response): Promise<void>
+     const orderId = event.resource.supplementary_data?.related_ids?.order_id || event.resource.id || 'unknown';
+     const captureId = event.resource.id;
+     const amount = event.resource.amount?.value || '38.97';
+-    shopState.recordCaptureSuccess(orderId, captureId, amount);
++    if ((shopState.getOrder(orderId)?.captureCount || 0) === 0) {
++      shopState.recordCaptureSuccess(orderId, captureId, amount);
++    }
+   }
+ 
+   res.status(200).json({

@@ -10,8 +10,10 @@ from contracts import Scenario
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BUGS_FILE = REPO_ROOT / "targets" / "demo-shop" / "bugs.yaml"
-# Curated fixes, tried in this order: the team's (targets/) first, then the copy bundled here.
-KNOWN_FIX_DIRS = [REPO_ROOT / "targets" / "known-fixes", Path(__file__).resolve().parent / "known_fixes"]
+# Curated fixes, tried in this order unless a fault has a verified Role C fallback.
+BUNDLED_FIX_DIR = Path(__file__).resolve().parent / "known_fixes"
+ROLE_C_PATCH_FIRST = {"BUG-01", "BUG-09"}
+KNOWN_FIX_DIRS = [REPO_ROOT / "targets" / "known-fixes", BUNDLED_FIX_DIR]
 
 
 class BugEntry(BaseModel):
@@ -33,7 +35,11 @@ def load_bugs(path: Path = DEFAULT_BUGS_FILE) -> List[BugEntry]:
 
 def known_fix_candidates(bug_id: str) -> List[Path]:
     """Curated fixes on disk for a bug, in the order the Fixer should try them."""
-    return [d / f"{bug_id}{ext}" for d in KNOWN_FIX_DIRS for ext in (".patch", ".diff") if (d / f"{bug_id}{ext}").is_file()]
+    dirs = list(KNOWN_FIX_DIRS)
+    if bug_id in ROLE_C_PATCH_FIRST and BUNDLED_FIX_DIR in dirs:
+        # The Role C integration patch supersedes the older target-side patch for these faults.
+        dirs = [BUNDLED_FIX_DIR] + [directory for directory in dirs if directory != BUNDLED_FIX_DIR]
+    return [d / f"{bug_id}{ext}" for d in dirs for ext in (".patch", ".diff") if (d / f"{bug_id}{ext}").is_file()]
 
 
 def find_bug(scenario: Scenario, bugs: List[BugEntry]) -> BugEntry:

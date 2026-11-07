@@ -25,11 +25,13 @@ Rules for the diff:
 SDK_NOTES = {
     "F1_LOST_CAPTURE_RESPONSE": (
         "ordersController.captureOrder({ id, prefer, paypalRequestId }) accepts paypalRequestId, which is "
-        "sent as the PayPal-Request-Id header. PayPal treats repeat calls with the same id as one request, so "
-        "a retry cannot capture twice. Derive the id from the order id (for example a sha256 of "
-        "`capture-${orderId}`) so every retry of the same capture sends the same value. Without it, a retry after a "
-        "lost response gets 422 ORDER_ALREADY_CAPTURED even though the buyer was charged, and the app wrongly marks "
-        "the order failed; with it, PayPal returns the original capture result (HTTP 200) so the app can record it."
+        "sent as the PayPal-Request-Id header. Derive it from the order id (for example a sha256 of "
+        "`capture-${orderId}`) so retries of the same capture use the same value. After an ambiguous 504 or "
+        "network error, first call ordersController.getOrder({ id: orderId }) and inspect its purchase-unit captures. "
+        "If the order contains a COMPLETED capture, record that capture id and amount in the app and return success "
+        "without retrying capture. Only retry with the same paypalRequestId when the status lookup shows no completed "
+        "capture or the lookup itself fails. A lost response does not prove the capture failed; a retry alone is not "
+        "enough to update the app's ledger."
     ),
     "F2_SLOW_PAYPAL": (
         "ordersController.createOrder({ body, prefer, paypalRequestId }) accepts paypalRequestId, which is "
@@ -59,11 +61,13 @@ SDK_NOTES = {
         "fractional cents and must be formatted as whole integers."
     ),
     "F6_WEBHOOK_REPLAY": (
-        "PayPal webhooks must be verified using transmission headers (paypal-transmission-sig, paypal-cert-url, "
-        "paypal-auth-algo, paypal-transmission-id) or PayPal's /v1/notifications/verify-webhook-signature API before "
-        "processing. Webhook event processing must be strictly idempotent: maintain a processed_events set or ledger, "
-        "and immediately return HTTP 200 DUPLICATE_IGNORED if an incoming event ID was already processed, preventing "
-        "duplicate fulfillment or double capture recordings."
+        "For BUG-09, keep the existing signature-validation flow and make event effects idempotent. "
+        "shopState.hasWebhookEvent(event.id) checks whether the event was recorded; after payload validation but before "
+        "ledger side effects, return HTTP 200 with status DUPLICATE_IGNORED when it is already present. "
+        "The checkout capture endpoint may already have recorded a completed capture before its webhook arrives. "
+        "For PAYMENT.CAPTURE.COMPLETED, derive orderId and only call recordCaptureSuccess when "
+        "(shopState.getOrder(orderId)?.captureCount || 0) === 0. This demo models one full capture per order, so the "
+        "webhook must not record a second local capture on top of the synchronous checkout result."
     ),
     "F7_PROMPT_INJECTION": (
         "In AI customer support workflows connected to payment tools, refund operations must never be triggered "

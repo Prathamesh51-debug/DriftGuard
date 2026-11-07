@@ -1,27 +1,60 @@
 diff --git a/src/checkout.ts b/src/checkout.ts
+index 61f9f9c..1530a24 100644
 --- a/src/checkout.ts
 +++ b/src/checkout.ts
 @@ -12,6 +12,7 @@
  import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';
  import { ordersController } from './paypal';
  import { shopState } from './state';
-+import crypto from 'crypto';
++import { createHash } from 'crypto';
  
  export interface CreateOrderResult {
    orderId: string;
-@@ -154,6 +155,7 @@
+@@ -154,6 +155,7 @@ export async function createCheckoutOrder(amount: string = '38.97', options?: Or
   * - BUG-03: Erroneously treats 422 INSTRUMENT_DECLINED as completed.
   */
  export async function captureCheckoutOrder(orderId: string, maxRetries: number = 2): Promise<CaptureResult> {
-+  const paypalRequestId = crypto.createHash('sha256').update(`capture-${orderId}`).digest('hex');
++  const paypalRequestId = createHash('sha256').update(`capture-${orderId}`).digest('hex');
    let attempts = 0;
    let lastError: any = null;
    while (attempts <= maxRetries) {
-@@ -163,6 +165,7 @@
+@@ -163,8 +165,7 @@ export async function captureCheckoutOrder(orderId: string, maxRetries: number =
        const { result } = await ordersController.captureOrder({
          id: orderId,
          prefer: 'return=representation',
+-        // BUG-01: Missing paypalRequestId (idempotency key)!
+-        // When proxy drops response with 504, retry sends another capture without idempotency.
 +        paypalRequestId,
-         // BUG-01: Missing paypalRequestId (idempotency key)!
-         // When proxy drops response with 504, retry sends another capture without idempotency.
        });
+ 
+       const captures = result.purchaseUnits?.[0]?.payments?.captures || [];
+@@ -202,8 +203,28 @@ export async function captureCheckoutOrder(orderId: string, maxRetries: number =
+ 
+       // On 504 Gateway Timeout or network failure, blindly retry without idempotency key
+       if (statusCode === 504 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
++        try {
++          const { result: order } = await ordersController.getOrder({ id: orderId });
++          const capture = order.purchaseUnits?.[0]?.payments?.captures?.find(
++            (candidate) => candidate.status === 'COMPLETED',
++          );
++          if (capture) {
++            const amount = capture.amount?.value || shopState.getOrder(orderId)?.expectedAmount || '38.97';
++            shopState.recordCaptureSuccess(orderId, capture.id, amount);
++            return {
++              success: true,
++              orderId,
++              captureId: capture.id,
++              status: 'COMPLETED',
++              attempts,
++            };
++          }
++        } catch {
++          // If status is temporarily unavailable, retry with the same idempotency key.
++        }
++
+         if (attempts <= maxRetries) {
+-          // Wait 200ms before retrying
++          // Wait briefly before retrying with the same idempotency key.
+           await new Promise((resolve) => setTimeout(resolve, 200));
+           continue;
+         }
