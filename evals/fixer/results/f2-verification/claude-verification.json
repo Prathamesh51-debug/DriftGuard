@@ -1,0 +1,24 @@
+{
+  "recorded_at_utc": "2026-11-07T17:32:44.000905+00:00",
+  "configured_model": "claude-haiku-5-5",
+  "provider": "anthropic",
+  "cache_enabled": false,
+  "curated_fallback_enabled": false,
+  "generation_input": "canonical failing fixture; not the live baseline result",
+  "accepted_on_attempt": 2,
+  "static_check_problems": [],
+  "runtime_check_passed": true,
+  "typescript_build_passed": true,
+  "spend_guard_total_usd_after_generation": 0.15176,
+  "sha256_utf8_lf": {
+    "source_checkout": "8d6bef354f66196788b8213aafdf94660aa7ac0519d72bcd074796b4fa9fefcf",
+    "scenario": "fe3b48400e1bfc5b05199117fb88dd6058e1c6c3da15e079b1542e5d03b60498",
+    "failure_fixture": "b1536ccc361b8c345ac072a9d5b399aad664e8fc0e6f3b66b91a850a3abb2bcc",
+    "accepted_patch": "9f61b42528d7b68b62c459abb471f00e640d8cd48f6ddd3cbc7c57107169395d",
+    "patched_checkout": "b8cdc8880028d22c7ba53c114dddc5eaf98d043bd321e58dce0d057608be0e50"
+  },
+  "live_sandbox_verdict": "PASS",
+  "audit_injection_and_retry_verified": true,
+  "independent_equal_price_purchase_verified": true,
+  "engine_api_persistence": false
+}

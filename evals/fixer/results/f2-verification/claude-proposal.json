@@ -1,0 +1,14 @@
+{
+  "bug_id": "BUG-02",
+  "applies": true,
+  "source": "llm",
+  "provider": "anthropic",
+  "diff": "--- a/src/checkout.ts\n+++ b/src/checkout.ts\n@@ -11,6 +11,7 @@\n \n import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';\n import { ordersController } from './paypal';\n+import { randomUUID } from 'crypto';\n import { shopState } from './state';\n \n export interface CreateOrderResult {\n@@ -86,6 +87,9 @@\n   const maxRetries = 1;\n   let lastError: any = null;\n \n+  const paypalRequestId = randomUUID();\n+  const referenceId = `cart-${Date.now()}`;\n+  const invoiceId = `INV-${Math.floor(Math.random() * 1000000)}`;\n   while (attempts <= maxRetries) {\n     attempts += 1;\n     try {\n@@ -95,7 +99,7 @@\n           purchaseUnits: [\n             {\n-              referenceId: `cart-${Date.now()}`,\n+              referenceId,\n               description: 'Autonomous Agent Guardrails Subscription',\n               // BUG-04: Non-deterministic random invoice ID\n-              invoiceId: `INV-${Math.floor(Math.random() * 1000000)}`,\n+              invoiceId,\n               amount: {\n@@ -116,6 +120,6 @@\n         },\n         prefer: 'return=representation',\n-        // BUG-02: Missing paypalRequestId (idempotency key)!\n+        paypalRequestId,\n       });\n \n       const orderId = result.id || '';\n",
+  "explanation": "Each checkout now generates one paypalRequestId (via randomUUID) plus fixed referenceId and invoiceId before the retry loop, and sends the same PayPal-Request-Id on every createOrder attempt, so a timed-out retry is deduplicated by PayPal instead of creating a second order.",
+  "files": [
+    "src/checkout.ts"
+  ],
+  "lines_changed": 10,
+  "attempts": 2,
+  "error": null
+}
