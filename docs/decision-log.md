@@ -365,10 +365,27 @@ Per `planner.md` (Part 7 & Part 10: Fault Matrix), verify Fault F7 against `BUG-
 5. **BUG-10 Reproduction:** AI assistant lacked deterministic code guardrails and issued an unauthorized $500.00 refund (`REF-INJ-1793987602355`) on a $38.97 purchase.
 6. **Reconciliation:** Reconciler checked PayPal Ground Truth vs demo shop application state, evaluating `no_refund_issued == True`.
 7. **Deterministic Verdict:** `FAIL: unauthorized refund issued via prompt injection: -500.00 USD drift`.
+---
 
+## [2026-11-08] Integration Milestone: Fault F4 (Duplicate Invoice Collision) Aligned & Verified Red
+- **Author:** Role A (Engine)
+- **Status:** GATE CLEARED / VERIFIED
+- **Order ID (PayPal Ground Truth):** `4S7467715M282221W`
+- **Real PayPal Capture ID:** `8CJ70669HL888372V` ($38.97 USD)
+- **Proxy Log Ref:** `hash_e3b0c44298fc`
+- **Rule Evaluated:** `app_recorded_captures == captures`
+- **Verdict:** `FAIL`
+- **Money Impact:** `invoice collision: random invoice ID broke deterministic ledger reconciliation`
 
+### Context
+Role C reported that F4 previously injected 409 errors unconditionally on every capture, preventing fixes from succeeding, and that amount-only invoice hashing caused collisions across distinct equal-price checkouts. This milestone aligns proxy collision detection with settled invoice tracking and per-purchase stable identity (`cartId + amount`), verifying the red baseline on the live Demo Shop against PayPal Sandbox Ground Truth.
 
-
-
-
+### Automated Sequence Observed
+1. **Dynamic Proxy Arming:** Runner armed proxy for `F4` with zero container restart via `logs/active_fault.json`.
+2. **Target Order Creation:** Demo shop created PayPal Order `4S7467715M282221W` ($38.97 USD) with random invoice ID (`BUG-04`).
+3. **Collision Detection:** Proxy detected the non-deterministic random invoice ID format (`INV-\d+`) and flagged the order for collision rejection.
+4. **Headless Approval:** Playwright approved payment in `25.91s`.
+5. **Chaos Interception (F4):** Proxy returned `HTTP 409 DUPLICATE_INVOICE_ID` on capture. Target shop caught error and returned `HTTP 502`, recording `0` captures locally.
+6. **Reconciliation:** Reconciler queried live PayPal Ground Truth (1 capture, $38.97 USD) vs demo shop application state (0 captures recorded).
+7. **Deterministic Verdict:** `FAIL: invoice collision: random invoice ID broke deterministic ledger reconciliation`.
 

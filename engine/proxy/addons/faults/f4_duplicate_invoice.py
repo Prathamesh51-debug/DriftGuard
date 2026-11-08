@@ -3,17 +3,16 @@ Fault F4: Duplicate Invoice Collision.
 Planner Ref: Part 10 (Fault Matrix) — F4 / BUG-04.
 
 Mechanism:
-  - Demo shop creates order with non-deterministic random invoice ID (BUG-04).
-  - Target shop creates PayPal order successfully (HTTP 201).
-  - On capture (POST .../capture), proxy injects a DUPLICATE_INVOICE_ID error (HTTP 409),
-    simulating that PayPal detected an invoice ID collision against a previously settled order.
-  - Demo shop capture fails; 0 captures recorded locally and in PayPal.
-  - Reconciler checks expectation (captures_per_purchase == 1):
-    Since invoice collision broke the purchase (captures == 0),
-    Reconciler emits FAIL: "invoice collision: random invoice ID broke deterministic ledger reconciliation".
+  - Tracks invoice IDs across order creation and capture.
+  - If an invoice ID is a duplicate of a previously settled invoice, or is non-deterministic / colliding,
+    the proxy injects HTTP 409 DUPLICATE_INVOICE_ID on capture.
+  - If the invoice ID is unique and deterministic, the capture proceeds cleanly (HTTP 201)
+    and the invoice ID is recorded as settled.
 """
 
 import json
+import re
+from typing import Dict, Set
 from mitmproxy import ctx, http
 
 PAYPAL_409_DUP_INVOICE_BODY = {
@@ -28,6 +27,14 @@ PAYPAL_409_DUP_INVOICE_BODY = {
     "debug_id": "driftguard-f4-dup-invoice-001"
 }
 
+_order_to_invoice: Dict[str, str] = {}
+_colliding_orders: Set[str] = set()
+_settled_invoices: Set[str] = set()
+
+
+def _is_create_order(flow: http.HTTPFlow) -> bool:
+    return flow.request.method == "POST" and flow.request.path.endswith("/v2/checkout/orders")
+
 
 def _is_capture(flow: http.HTTPFlow) -> bool:
     return (
@@ -37,24 +44,64 @@ def _is_capture(flow: http.HTTPFlow) -> bool:
     )
 
 
+def _extract_order_id(path: str) -> str:
+    parts = path.strip("/").split("/")
+    return parts[-2] if len(parts) >= 2 and parts[-1] == "capture" else ""
+
+
 def arm_request(flow: http.HTTPFlow):
-    """Flag capture requests for F4 collision simulation."""
-    if _is_capture(flow):
-        flow.metadata["inject_f4"] = True
-        ctx.log.warn(f"[F4 ARMED] Capture request detected on {flow.request.path} — will simulate invoice collision.")
+    if _is_create_order(flow):
+        try:
+            body = json.loads(flow.request.content.decode("utf-8"))
+            pu = (body.get("purchaseUnits") or body.get("purchase_units") or [{}])[0]
+            invoice_id = pu.get("invoiceId") or pu.get("invoice_id") or ""
+            flow.metadata["invoice_id"] = invoice_id
+
+            # Collision: either invoice was already paid, or it's random/unstable
+            if invoice_id in _settled_invoices or re.match(r"^INV-\d+$", invoice_id):
+                flow.metadata["f4_collision"] = True
+                if hasattr(ctx, "log") and hasattr(ctx.log, "warn"):
+                    ctx.log.warn(f"[F4 DETECTED] Duplicate/unstable invoice ID collision: {invoice_id}")
+        except Exception:
+            pass
+
+    elif _is_capture(flow):
+        order_id = _extract_order_id(flow.request.path)
+        if order_id in _colliding_orders or flow.metadata.get("f4_collision"):
+            flow.metadata["inject_f4"] = True
+            if hasattr(ctx, "log") and hasattr(ctx.log, "warn"):
+                ctx.log.warn(f"[F4 ARMED] Injected collision on capture for order {order_id}")
 
 
 def inject_response(flow: http.HTTPFlow) -> bool:
-    """Override capture response with HTTP 409 DUPLICATE_INVOICE_ID."""
-    if not flow.metadata.get("inject_f4"):
+    if _is_create_order(flow):
+        try:
+            res = json.loads(flow.response.content.decode("utf-8"))
+            order_id = res.get("id")
+            invoice_id = flow.metadata.get("invoice_id")
+            if order_id and invoice_id:
+                _order_to_invoice[order_id] = invoice_id
+                if flow.metadata.get("f4_collision"):
+                    _colliding_orders.add(order_id)
+        except Exception:
+            pass
         return False
 
-    ctx.log.error(
-        "[F4 INJECTED] Simulating DUPLICATE_INVOICE_ID collision on capture (HTTP 409)."
-    )
-    flow.response = http.Response.make(
-        409,
-        json.dumps(PAYPAL_409_DUP_INVOICE_BODY).encode("utf-8"),
-        {"Content-Type": "application/json"}
-    )
-    return True
+    if _is_capture(flow):
+        order_id = _extract_order_id(flow.request.path)
+        invoice_id = _order_to_invoice.get(order_id, flow.metadata.get("invoice_id"))
+
+        if flow.metadata.get("inject_f4") or order_id in _colliding_orders:
+            if hasattr(ctx, "log") and hasattr(ctx.log, "error"):
+                ctx.log.error(f"[F4 INJECTED] Returning 409 DUPLICATE_INVOICE_ID for order {order_id}")
+            flow.response = http.Response.make(
+                409,
+                json.dumps(PAYPAL_409_DUP_INVOICE_BODY).encode("utf-8"),
+                {"Content-Type": "application/json"}
+            )
+            return True
+        elif invoice_id and flow.response and flow.response.status_code in (200, 201):
+            _settled_invoices.add(invoice_id)
+            return False
+
+    return False

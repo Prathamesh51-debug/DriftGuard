@@ -32,6 +32,7 @@ export interface OrderOptions {
   currency?: string;
   taxRate?: number;
   discount?: string;
+  cartId?: string;
 }
 
 /**
