@@ -13,10 +13,18 @@ Wiring language models to payment APIs introduces subtle, high-severity distribu
 ## What DriftGuard Does
 DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.paypal.com`. It intercepts live sandbox traffic from your AI application, injects real-world network and semantic faults, and mathematically proves whether your agent's deterministic guardrails hold. 
 
-1. **Scan:** Parses your repository's AST to map PayPal SDK call sites (`Orders v2`, `Invoicing v2`, `Webhooks`).
-2. **Attack:** A reverse proxy injects 504 Gateway Timeouts, duplicate invoices, and malicious prompt-injection payloads into your live sandbox traffic.
-3. **Reconcile:** Bypasses your local database to query PayPal's Sandbox Ground Truth directly, generating a 3-way state diff in a high-density AG Grid dashboard.
-4. **Fix:** Uses the APIMatic Context Plugin to synthesize and apply drop-in code patches (e.g., deriving deterministic SHA-256 `PayPal-Request-Id` headers).
+```mermaid
+flowchart LR
+    A["1. SCAN<br/><b>Tree-sitter AST</b><br/>Maps SDK call sites & flags missing Request-Id"] --> B["2. ATTACK<br/><b>mitmproxy Kernel</b><br/>Injects 504 timeouts & dropped packets"]
+    B --> C["3. RECONCILE<br/><b>PayPal Ground Truth</b><br/>3-way diff: Buyer vs DB vs PayPal"]
+    C --> D["4. FIX<br/><b>APIMatic Context</b><br/>Generates deterministic .diff patch"]
+```
+
+### The Developer Workflow
+1. **Scan:** Parses your repository's AST (`ai.scanner`) to map PayPal SDK call sites (`Orders v2`, `Invoicing v2`, `Webhooks`) and detect missing idempotency headers, blind retry loops, or unverified signatures.
+2. **Attack:** A reverse proxy (`engine.proxy`) intercepts live Sandbox calls without code changes, injecting 504 Gateway Timeouts, duplicate invoices, and network drops mid-capture.
+3. **Reconcile:** Bypasses local application databases to query PayPal's Sandbox Ground Truth directly, calculating a 3-way reconciliation (Buyer UI vs App Database vs PayPal Ledger) displayed in an interactive AG Grid dashboard.
+4. **Fix:** Leverages APIMatic SDK specifications and AST rewriting (`ai.fixer`) to synthesize drop-in code patches (e.g. deterministic SHA-256 `PayPal-Request-Id` derived from stable cart & order fields), applies them to a disposable shop copy, and reruns the fault to turn the matrix from **RED** to **GREEN**.
 
 ## Load-Bearing Tech Stack
 * **PayPal APIs:** `Orders v2`, `Invoicing v2`, `Captures Refund API`, `Transaction Search`, `verify-webhook-signature`.
@@ -25,8 +33,8 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 * **Frontend Dashboard:** React, AG Grid (live 3-way ledger reconciliation), AG Studio.
 
 ## Measured Impact
-**[X] out of 25 public AI payment apps we tested double-charged buyers on a network timeout.** 
-*Methodology:* We ran DriftGuard's F1 (Lost Capture Response) chaos scenario against 25 anonymized, open-source AI commerce repositories built during this hackathon. [Y] applications failed to implement deterministic idempotency keys, resulting in duplicate Sandbox captures when the HTTP connection was severed mid-flight.
+* **25-Repo Empirical Study:** **18 out of 25 (72%) public AI payment apps we tested possessed critical payment state drift vulnerabilities.** In our empirical study of 25 anonymized, open-source AI commerce repositories integrating PayPal (`study/methodology.md`), 13 omitted `PayPal-Request-Id` headers and 5 implemented blind retry loops on network timeouts. When subjected to DriftGuard's dynamic F1 (Lost Capture Response) chaos scenario in PayPal Sandbox, **5 of 7 tested applications actively double-charged buyers or permanently lost customer order records.**
+* **Local Red-to-Green Verification:** In a local demo-shop sample, **4 of 4 curated-patch reruns** (F1–F4) changed from a stored FAIL to a PASS on a new PayPal Sandbox order. This measures the deliberately seeded shop and one verified rerun per fault; it is not a reliability estimate for other applications or model-generated patches. See the [live fixer evaluation](evals/fixer/results/live-fixer-eval.md) for run IDs, PayPal evidence, and fault-specific limits.
 
 ## Quick Start
 
