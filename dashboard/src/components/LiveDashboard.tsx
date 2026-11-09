@@ -56,6 +56,7 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
     propose,
     reconnected,
     rerun,
+    verify,
     runs,
   } = useDashboardRuns()
   const [selectedId, setSelectedId] = useState<string | null>(runId)
@@ -68,12 +69,14 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
     }
   })
   const [compareBeforeId, setCompareBeforeId] = useState<string | null>(null)
+  const [compareAfterId, setCompareAfterId] = useState<string | null>(null)
   const evidenceReturnFocus = useRef<HTMLElement | null>(null)
 
   const selected = useMemo(() => runs.find((run) => run.run_id === selectedId) ?? null, [runs, selectedId])
   const compareBefore = useMemo(() => runs.find((run) => run.run_id === compareBeforeId) ?? null, [runs, compareBeforeId])
-  const compareAfter = compareBefore ? rerunOf(runs, compareBefore.run_id) : undefined
-  const compareFix = compareBeforeId ? fixes[compareBeforeId] : undefined
+  const compareAfter = compareAfterId
+    ? runs.find((run) => run.run_id === compareAfterId)
+    : compareBefore ? rerunOf(runs, compareBefore.run_id) : undefined
   const drawerOpen = selected !== null && view !== 'run'
 
   useEffect(() => {
@@ -121,14 +124,19 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
   }
 
   const rerunAndCompare = async (runId: string) => {
-    const rerunResult = await runActionAndOpen(() => rerun(runId))
-    if (rerunResult) setCompareBeforeId(runId)
+    const failed = runs.find((run) => run.run_id === runId)?.result?.verdict === 'FAIL'
+    const rerunResult = await runActionAndOpen(() => failed ? verify(runId) : rerun(runId))
+    if (rerunResult) {
+      setCompareBeforeId(runId)
+      setCompareAfterId(rerunResult.run_id)
+    }
   }
 
   const compareFor = (run: Run): { label: string; open: () => void } | null => {
     const original = originalOf(runs, run)
-    if (original) return { label: 'See before and after', open: () => setCompareBeforeId(original.run_id) }
-    if (rerunOf(runs, run.run_id)) return { label: 'See before and after', open: () => setCompareBeforeId(run.run_id) }
+    if (original) return { label: 'See before and after', open: () => { setCompareBeforeId(original.run_id); setCompareAfterId(run.run_id) } }
+    const child = rerunOf(runs, run.run_id)
+    if (child) return { label: 'See before and after', open: () => { setCompareBeforeId(run.run_id); setCompareAfterId(child.run_id) } }
     return null
   }
 
@@ -193,7 +201,7 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
         <BeforeAfter
           before={compareBefore}
           after={compareAfter}
-          proposal={compareFix?.status === 'ready' ? compareFix.proposal : undefined}
+          proposal={compareAfter?.fix?.proposal}
           onClose={() => setCompareBeforeId(null)}
         />
       )}

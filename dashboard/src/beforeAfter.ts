@@ -6,6 +6,8 @@ export type CompareOutcome = 'waiting' | 'fixed' | 'still_failing' | 'error' | '
 export function compareOutcome(before: Run, after: Run | undefined): CompareOutcome {
   if (before.result?.verdict !== 'FAIL') return 'not_comparable'
   if (!after?.result) return 'waiting'
+  if (after.result.verdict === 'ERROR') return 'error'
+  if (!after.fix?.patch_sha256 || !after.fix.proposal.applies) return 'not_comparable'
   switch (after.result.verdict) {
     case 'PASS':
       return 'fixed'

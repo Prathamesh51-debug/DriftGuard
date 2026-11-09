@@ -60,7 +60,7 @@ const VERDICT_TEXT: Record<CompareOutcome, { cls: string; title: string; body: s
   fixed: { cls: 'notice-pass', title: 'Fixed, and PayPal agrees', body: 'The same scenario that lost a payment now passes: PayPal and the app record the same capture.' },
   still_failing: { cls: 'notice-error', title: 'Still failing', body: 'The same scenario fails again, so this change did not fix the problem.' },
   error: { cls: 'notice-error', title: 'The re-run could not finish', body: 'No verdict was reached, so nothing is proven either way.' },
-  not_comparable: { cls: '', title: 'Nothing to compare', body: 'The first run did not fail.' },
+  not_comparable: { cls: '', title: 'Fix not proven', body: 'A passing repeat alone does not prove the proposed code was applied. A verified patch and a passing run are both required.' },
 }
 
 export function BeforeAfter({
@@ -93,7 +93,7 @@ export function BeforeAfter({
         <header className="ba-head">
           <div>
             <div className="eyebrow">{faultLabel(before.scenario.fault)}</div>
-            <h2>Before and after the fix</h2>
+            <h2>Before and after</h2>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close before and after view">
             ✕

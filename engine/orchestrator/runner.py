@@ -5,6 +5,7 @@ Coordinates: Target App -> Headless Buyer Driver -> Chaos Proxy -> Reconciler.
 
 import json
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -98,7 +99,8 @@ def run_scenario(
     scenario: Scenario,
     target_shop_url: str = "http://localhost:3001",
     proxy_url: str = "http://localhost:8080",
-    max_retries: int = 1
+    max_retries: int = 1,
+    scope_proxy_log: bool = False,
 ) -> Result:
     """
     Executes an end-to-end chaos test run on a target shop:
@@ -109,6 +111,8 @@ def run_scenario(
     4. Runs Reconciler to generate mathematically proven Result
     """
     shop_base = target_shop_url.rstrip("/")
+    audit_path = ROOT_DIR / "logs" / "proxy_traffic.jsonl"
+    audit_offset = audit_path.stat().st_size if scope_proxy_log and audit_path.exists() else 0
 
     # 0. Dynamically arm chaos proxy
     fault_code = scenario.fault.value.split("_")[0].upper()
@@ -212,11 +216,21 @@ def run_scenario(
 
     # 5. Run Reconciler to produce final ground truth Result
     print(f"[ORCHESTRATOR] 4. Reconciling ground truth from PayPal records...")
-    result = reconcile_order(
-        scenario=scenario,
-        order_id=order_id,
-        demo_shop_url=shop_base
-    )
+    if scope_proxy_log:
+        # The shared proxy log includes older orders. Reconciliation must only
+        # inspect entries written during this particular patched-shop run.
+        with tempfile.TemporaryDirectory(prefix="driftguard-audit-") as scratch:
+            scoped_path = Path(scratch) / "proxy_traffic.jsonl"
+            with scoped_path.open("wb") as scoped:
+                if audit_path.exists():
+                    with audit_path.open("rb") as shared:
+                        shared.seek(audit_offset)
+                        scoped.write(shared.read())
+            result = reconcile_order(scenario=scenario, order_id=order_id,
+                                     demo_shop_url=shop_base, log_path=scoped_path)
+    else:
+        result = reconcile_order(scenario=scenario, order_id=order_id,
+                                 demo_shop_url=shop_base)
     print(f"[ORCHESTRATOR] Verdict: {result.verdict.value} | Impact: {result.money_impact}")
     return result
 

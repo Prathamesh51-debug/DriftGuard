@@ -14,6 +14,8 @@ export const listRuns = (): Promise<Run[]> => request<Run[]>('/runs')
 export const launchRun = (): Promise<Run> => request<Run>('/runs', { method: 'POST' })
 export const rerunRun = (runId: string): Promise<Run> =>
   request<Run>(`/runs/${runId}/rerun`, { method: 'POST' })
+export const verifyFixRun = (runId: string): Promise<Run> =>
+  request<Run>(`/runs/${runId}/verify-fix`, { method: 'POST' })
 
 /** Ask the Fixer for a patch for a failing run. Nothing is applied: the answer is a checked diff. */
 export async function proposeFix(run: Run): Promise<FixProposal> {

@@ -52,9 +52,11 @@ class DBBackend:
                             created_at DOUBLE PRECISION NOT NULL,
                             scenario_json JSONB NOT NULL,
                             result_json JSONB,
-                            rerun_of VARCHAR(64)
+                            rerun_of VARCHAR(64),
+                            fix_json JSONB
                         );
                     """)
+                    cur.execute("ALTER TABLE runs ADD COLUMN IF NOT EXISTS fix_json JSONB")
                 conn.commit()
         else:
             with sqlite3.connect(SQLITE_DB_PATH) as conn:
@@ -66,10 +68,25 @@ class DBBackend:
                         created_at REAL NOT NULL,
                         scenario_json TEXT NOT NULL,
                         result_json TEXT,
-                        rerun_of TEXT
+                        rerun_of TEXT,
+                        fix_json TEXT
                     );
                 """)
+                if "fix_json" not in {row[1] for row in cur.execute("PRAGMA table_info(runs)")}:
+                    cur.execute("ALTER TABLE runs ADD COLUMN fix_json TEXT")
                 conn.commit()
+
+    def set_run_fix(self, run_id: str, fix_data: Dict[str, Any]):
+        payload = json.dumps(fix_data)
+        if self.use_postgres:
+            import psycopg2
+            with psycopg2.connect(DATABASE_URL) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE runs SET fix_json = %s WHERE run_id = %s", (payload, run_id))
+                conn.commit()
+        else:
+            with sqlite3.connect(SQLITE_DB_PATH) as conn:
+                conn.execute("UPDATE runs SET fix_json = ? WHERE run_id = ?", (payload, run_id))
 
     def create_run(self, run_id: str, scenario_data: Dict[str, Any], rerun_of: Optional[str] = None) -> Dict[str, Any]:
         created_at = time.time()
@@ -130,12 +147,12 @@ class DBBackend:
             import psycopg2
             with psycopg2.connect(DATABASE_URL) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of FROM runs WHERE run_id = %s", (run_id,))
+                    cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of, fix_json FROM runs WHERE run_id = %s", (run_id,))
                     row = cur.fetchone()
         else:
             with sqlite3.connect(SQLITE_DB_PATH) as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of FROM runs WHERE run_id = ?", (run_id,))
+                cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of, fix_json FROM runs WHERE run_id = ?", (run_id,))
                 row = cur.fetchone()
 
         if not row:
@@ -152,7 +169,8 @@ class DBBackend:
             "created_at": row[2],
             "scenario": scenario,
             "result": result,
-            "rerun_of": row[5]
+            "rerun_of": row[5],
+            "fix": row[6] if isinstance(row[6], dict) else json.loads(row[6]) if row[6] else None,
         }
 
     def list_runs(self) -> List[Dict[str, Any]]:
@@ -161,12 +179,12 @@ class DBBackend:
             import psycopg2
             with psycopg2.connect(DATABASE_URL) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of FROM runs ORDER BY created_at DESC")
+                    cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of, fix_json FROM runs ORDER BY created_at DESC")
                     rows = cur.fetchall()
         else:
             with sqlite3.connect(SQLITE_DB_PATH) as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of FROM runs ORDER BY created_at DESC")
+                cur.execute("SELECT run_id, status, created_at, scenario_json, result_json, rerun_of, fix_json FROM runs ORDER BY created_at DESC")
                 rows = cur.fetchall()
 
         for row in rows:
@@ -180,7 +198,8 @@ class DBBackend:
                 "created_at": row[2],
                 "scenario": scenario,
                 "result": result,
-                "rerun_of": row[5]
+                "rerun_of": row[5],
+                "fix": row[6] if isinstance(row[6], dict) else json.loads(row[6]) if row[6] else None,
             })
         return runs
 

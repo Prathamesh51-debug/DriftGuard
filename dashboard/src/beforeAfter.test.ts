@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import scenario from '../../contracts/fixtures/f1_scenario.json'
 import fail from '../../contracts/fixtures/f1_result_fail.json'
 import pass from '../../contracts/fixtures/f1_result_pass.json'
-import type { Run } from './types'
+import type { FixProposal, Run } from './types'
 import { classifyDiffLine, compareOutcome, describeError, originalOf, rerunOf } from './beforeAfter'
 
 const run = (id: string, result: unknown, rerun_of: string | null = null): Run =>
@@ -11,11 +11,16 @@ const run = (id: string, result: unknown, rerun_of: string | null = null): Run =
 describe('compareOutcome', () => {
   const red = run('run_a', fail)
 
-  it('is fixed only when the repeat of a failing run passes', () => {
-    expect(compareOutcome(red, run('run_b', pass, 'run_a'))).toBe('fixed')
+  it('is fixed only when the verified patch runs and passes', () => {
+    const after = run('run_b', pass, 'run_a')
+    after.fix = { proposal: { applies: true } as FixProposal, patch_sha256: 'sha' }
+    expect(compareOutcome(red, after)).toBe('fixed')
+    expect(compareOutcome(red, run('run_c', pass, 'run_a'))).toBe('not_comparable')
   })
   it('says still failing when the repeat fails again', () => {
-    expect(compareOutcome(red, run('run_b', fail, 'run_a'))).toBe('still_failing')
+    const after = run('run_b', fail, 'run_a')
+    after.fix = { proposal: { applies: true } as FixProposal, patch_sha256: 'sha' }
+    expect(compareOutcome(red, after)).toBe('still_failing')
   })
   it('waits while the repeat has no result, and while it does not exist yet', () => {
     expect(compareOutcome(red, run('run_b', null, 'run_a'))).toBe('waiting')

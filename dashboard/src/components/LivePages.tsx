@@ -344,7 +344,7 @@ export function RunDetailPage({
             {copyState === 'copied' ? 'Copied' : 'Copy CLI command'}
           </button>
           <button className="btn btn-primary" type="button" disabled={busy} onClick={() => onRerun(run.run_id)}>
-            {busy ? 'Re-running…' : 'Re-run'}
+              {busy ? 'Starting…' : failed ? 'Generate and verify fix' : 'Re-run scenario'}
           </button>
         </div>
       </div>
@@ -437,7 +437,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const appCount = run.result.observed.app_recorded_captures
     return `PayPal ${run.result.observed.captures} capture${run.result.observed.captures === 1 ? '' : 's'}. Your app ${appCount == null ? 'has no reading' : `${appCount} capture${appCount === 1 ? '' : 's'}`}.`
   }
-  const toneClass = (run?: Run) => run?.result?.verdict === 'PASS'
+  const toneClass = (run?: Run) => run?.result?.verdict === 'PASS' && run.fix?.patch_sha256
     ? 'is-good'
     : run?.result?.verdict
       ? 'is-bad'
@@ -456,7 +456,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const setPosition = (value: number) => {
       splitRef.current = value
       proof.style.setProperty('--split', `${value}%`)
-      if (value < 40 && !seen && after?.result?.verdict === 'PASS') {
+      if (value < 40 && !seen && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) {
         seen = true
         setPop(true)
         if (popTimer != null) window.clearTimeout(popTimer)
@@ -509,29 +509,29 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
       if (popTimer != null) window.clearTimeout(popTimer)
       window.cancelAnimationFrame(frame)
     }
-  }, [after?.result?.verdict])
+  }, [after?.result?.verdict, after?.fix?.patch_sha256])
 
   const handleSplit = (value: number) => {
     autoRef.current = false
     splitRef.current = value
     proofRef.current?.style.setProperty('--split', `${value}%`)
-    if (value < 40 && after?.result?.verdict === 'PASS') setPop(true)
+    if (value < 40 && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) setPop(true)
     else setPop(false)
   }
 
   return (
     <section className="s02-comparison">
-      <h2>Before and after the fix</h2>
+      <h2>Before and after</h2>
       <div ref={proofRef} className={`s02-proof${pop ? ' is-pop' : ''}`} style={{ '--split': '80%' } as CSSProperties}>
         <div className={`s02-proof-side ${toneClass(before)}`}>
-          <span>Before the fix</span>
+          <span>Original run</span>
           <strong>{before.result?.verdict ?? 'RUNNING'}</strong>
           <p>{resultText(before)}</p>
         </div>
         <div className={`s02-proof-side ${toneClass(after)}`}>
-          <span>After the fix</span>
+          <span>Repeat run</span>
           <strong>{after?.result?.verdict ?? (after ? 'RUNNING' : 'NOT RUN')}</strong>
-          <p>{after ? resultText(after) : 'Re-run this scenario to compare a checked fix.'}</p>
+          <p>{after ? resultText(after) : 'Generate and verify a fix to compare results.'}</p>
         </div>
         <div className="s02-proof-divider" aria-hidden="true" />
         <span className="s02-proof-knob" aria-hidden="true">↔</span>
@@ -545,7 +545,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
           onChange={(event) => handleSplit(Number(event.target.value))}
         />
       </div>
-      <p className="s02-proof-caption">{after ? 'Same test, same PayPal order. Only the code changed.' : 'Re-run this scenario after a fix to compare both results.'}</p>
+      <p className="s02-proof-caption">{after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : 'Generate and verify a fix to compare both runs.'}</p>
     </section>
   )
 }

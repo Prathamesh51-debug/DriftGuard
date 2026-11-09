@@ -61,11 +61,12 @@ export interface Result {
 
 export interface Run {
   run_id: string
-  status: 'running' | 'complete'
+  status: 'running' | 'complete' | 'error'
   created_at: number
   scenario: Scenario
   result: Result | null
   rerun_of: string | null
+  fix?: { proposal: FixProposal; patch_sha256: string } | null
 }
 
 /** The AI service's answer to POST /fix (mirrors ai.fixer.FixProposal). */

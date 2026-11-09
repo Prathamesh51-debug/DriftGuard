@@ -37,6 +37,7 @@ class Run(BaseModel):
     scenario: Scenario
     result: Optional[Result] = None
     rerun_of: Optional[str] = None
+    fix: Optional[dict] = None
 
 
 class LaunchRunRequest(BaseModel):
@@ -97,6 +98,23 @@ def _execute_run(run_id: str, scenario: Scenario):
         db.update_run_result(run_id, "error", error_result.model_dump())
 
 
+def _execute_verified_run(run_id: str, scenario: Scenario, failing: Result):
+    """Build a server-generated patch in a disposable shop and persist its proof."""
+    from ai.fixer.verify_run import generate_and_verify
+
+    try:
+        def record_patch(proposal, patch_sha256: str):
+            db.set_run_fix(run_id, {
+                "proposal": proposal.model_dump(),
+                "patch_sha256": patch_sha256,
+            })
+
+        result = generate_and_verify(scenario, failing, record_patch)
+        db.update_run_result(run_id, "complete", result.model_dump())
+    except Exception as exc:
+        db.update_run_result(run_id, "error", _make_error_result(scenario, exc).model_dump())
+
+
 @app.get("/health")
 def health() -> dict:
     return {
@@ -117,7 +135,8 @@ def list_runs() -> List[Run]:
             created_at=r["created_at"],
             scenario=Scenario.model_validate(r["scenario"]),
             result=Result.model_validate(r["result"]) if r.get("result") else None,
-            rerun_of=r.get("rerun_of")
+            rerun_of=r.get("rerun_of"),
+            fix=r.get("fix"),
         )
         for r in raw_runs
     ]
@@ -171,7 +190,8 @@ def get_run(run_id: str) -> Run:
         created_at=r["created_at"],
         scenario=Scenario.model_validate(r["scenario"]),
         result=Result.model_validate(r["result"]) if r.get("result") else None,
-        rerun_of=r.get("rerun_of")
+        rerun_of=r.get("rerun_of"),
+        fix=r.get("fix"),
     )
 
 
@@ -201,3 +221,24 @@ def rerun(run_id: str, background_tasks: BackgroundTasks) -> Run:
         result=None,
         rerun_of=run_id
     )
+
+
+@app.post("/runs/{run_id}/verify-fix", response_model=Run, status_code=201)
+def verify_fix(run_id: str, background_tasks: BackgroundTasks) -> Run:
+    """Generate and execute a patch. Explicitly opt in on trusted deployments."""
+    if os.getenv("DRIFTGUARD_ENABLE_FIX_RERUN") != "1":
+        raise HTTPException(status_code=503, detail="Patch execution is disabled on this engine")
+    parent = db.get_run(run_id)
+    if not parent:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    if parent["status"] == "running":
+        raise HTTPException(status_code=409, detail="Wait for the run to finish")
+    failing = Result.model_validate(parent["result"]) if parent.get("result") else None
+    if failing is None or failing.verdict != Verdict.FAIL:
+        raise HTTPException(status_code=422, detail="Only failed runs can be fixed and verified")
+    scenario = Scenario.model_validate(parent["scenario"])
+    new_run_id = f"run_{uuid.uuid4().hex[:8]}"
+    created = db.create_run(new_run_id, scenario.model_dump(), rerun_of=run_id)
+    background_tasks.add_task(_execute_verified_run, new_run_id, scenario, failing)
+    return Run(run_id=new_run_id, status=created["status"], created_at=created["created_at"],
+               scenario=scenario, rerun_of=run_id)

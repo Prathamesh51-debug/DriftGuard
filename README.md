@@ -30,26 +30,22 @@ DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.p
 
 ## Quick Start
 
-### Open the frontend
+### Run the live demo locally
 
-The `/live` dashboard reads fixture data from the local mock API. This mode does not call PayPal or an LLM.
+Copy `.env.example` to `.env` and set PayPal Sandbox credentials and a Sandbox buyer. From the repository root, start these in separate terminals:
 
-1. Start the mock API from the repository root:
-   ```bash
-   pip install -r mock_runner/requirements.txt
-   uvicorn mock_runner.app:app --port 8000
-   ```
-2. In another terminal, start the dashboard:
-   ```bash
-   cd dashboard
-   npm install
-   npm run dev
-   ```
-3. Open `http://localhost:5173/` for the landing page. Use **Open live dashboard** or go to `/live` to view runs and Ask Studio.
+```bash
+docker compose up -d
+python -m uvicorn engine.api.main:app --port 8000
+npm --prefix targets/demo-shop install
+npm --prefix targets/demo-shop run dev
+npm --prefix dashboard install
+npm --prefix dashboard run dev
+```
 
-### Connect the real engine
+Open `http://localhost:5173/` for the landing page or `/live` for stored engine runs. The dashboard defaults to the engine at `http://localhost:8000`; set `VITE_API_URL` when it runs elsewhere. Ask Studio also needs the AI service on port 8001.
 
-Copy `.env.example` to `.env` and configure the sandbox and model-provider credentials. `make up` starts Postgres and mitmproxy; it does not start the API or frontend. Start the engine API separately with `make api`, then run the frontend as above. The live dashboard at `/live` defaults to `http://localhost:8000`; set `VITE_API_URL` if the API is hosted elsewhere.
+For the local red-to-green proof, set `DRIFTGUARD_ENABLE_FIX_RERUN=1` in `.env` before starting the engine. A failed run's **Generate and verify fix** action applies a server-generated diff to a disposable shop copy, builds it, makes a fresh Sandbox purchase through the proxy, and stores the patch hash and reconciled result in a child run. `DRIFTGUARD_LLM=none` uses the curated patch without a model call. Keep this setting off on public deployments: the patched Node process executes generated code and is not a security sandbox.
 
 ## Repository Structure
 * `/engine` - The MITM proxy, deterministic reconciler, and API orchestrator.

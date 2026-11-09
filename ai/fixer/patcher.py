@@ -1,6 +1,7 @@
 """Checks and applies a model-written diff to a COPY of the target app. The original is never touched."""
 
 import re
+import os
 import shutil
 import subprocess
 import tempfile
@@ -41,9 +42,11 @@ def _scan(diff: str) -> Tuple[List[str], int]:
 
 
 def _git_apply(args: List[str], diff: str, cwd: Path) -> Optional[str]:
+    env = os.environ.copy()
+    env["GIT_CEILING_DIRECTORIES"] = str(cwd.parent)
     proc = subprocess.run(
         ["git", "apply", "--recount", "--ignore-whitespace", *args, "-"],
-        input=diff, text=True, capture_output=True, cwd=cwd,
+        input=diff, text=True, capture_output=True, cwd=cwd, env=env,
     )
     return None if proc.returncode == 0 else (proc.stderr.strip() or "git apply failed")
 

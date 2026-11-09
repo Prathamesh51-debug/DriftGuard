@@ -241,8 +241,8 @@ export function EvidenceDrawer({
                   {fix?.status === 'loading' ? 'Asking the Fixer…' : 'Propose fix'}
                 </button>
               )}
-              <button className={`btn ${compare ? '' : 'btn-primary'}`} disabled={busy} onClick={() => onRerun(run.run_id)}>
-                {busy ? 'Re-running…' : 'Re-run after fix'}
+                <button className={`btn ${compare ? '' : 'btn-primary'}`} disabled={busy} onClick={() => onRerun(run.run_id)}>
+                  {busy ? 'Starting…' : run.result?.verdict === 'FAIL' ? 'Generate and verify fix' : 'Re-run scenario'}
               </button>
             </>
           )}

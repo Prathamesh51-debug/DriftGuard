@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { launchRun, listRuns, proposeFix, rerunRun } from '../api'
+import { launchRun, listRuns, proposeFix, rerunRun, verifyFixRun } from '../api'
 import { nextPollDelay } from '../polling'
 import type { FixState, Run } from '../types'
 
@@ -90,6 +90,7 @@ export function useDashboardRuns() {
 
   const launch = useCallback(() => runAction(launchRun), [runAction])
   const rerun = useCallback((runId: string) => runAction(() => rerunRun(runId)), [runAction])
+  const verify = useCallback((runId: string) => runAction(() => verifyFixRun(runId)), [runAction])
 
   const propose = useCallback(async (run: Run) => {
     setFixes((current) => ({ ...current, [run.run_id]: { status: 'loading' } }))
@@ -116,6 +117,7 @@ export function useDashboardRuns() {
     refresh,
     reconnected,
     rerun,
+    verify,
     runs,
   }
 }
