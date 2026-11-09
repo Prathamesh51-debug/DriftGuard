@@ -48,10 +48,12 @@ SDK_NOTES = {
         "to choose a different payment method. Erroneously recording capture success on 422 causes false fulfillment."
     ),
     "F4_DUPLICATE_INVOICE": (
-        "In ordersController.createOrder, purchaseUnits[0].invoiceId must be deterministically derived from the order contents "
-        "or cart (for example a hash of cart contents: `INV-${crypto.createHash('sha256').update(`cart-${amount}`).digest('hex').substring(0, 16).toUpperCase()}`) "
-        "instead of using Math.random(). Random invoice IDs make reconciliation impossible and risk duplicate invoice collisions. "
-        "Deterministic invoice IDs guarantee idempotent tracking across order attempts."
+        "In ordersController.createOrder, derive purchaseUnits[0].invoiceId from a stable cart identity and final amount, "
+        "not from the amount alone: distinct carts can cost the same. Use options.cartId when supplied; for a checkout "
+        "without a cart ID, generate one with crypto.randomUUID() before the retry loop. Do not use Date.now() or "
+        "Math.random() for cart identity because same-time checkouts can collide. Hash cartId and finalAmount to form "
+        "the invoice ID. Compute cartId, referenceId, and invoiceId once per createCheckoutOrder call so retries reuse "
+        "the same order body. Avoid changing unrelated capture and money calculations."
     ),
     "F5_MONEY_MATH_TRAP": (
         "In PayPal Orders v2, currency amounts must be calculated using integer minor units or strict Decimal "

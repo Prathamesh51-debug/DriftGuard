@@ -14,6 +14,7 @@ SHOP = ROOT / "targets" / "demo-shop"
 GOOD_DIFF = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-01.diff").read_text(encoding="utf-8")
 GOOD_DIFF_02 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-02.diff").read_text(encoding="utf-8")
 GOOD_DIFF_03 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-03.diff").read_text(encoding="utf-8")
+GOOD_DIFF_04 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-04.diff").read_text(encoding="utf-8")
 GOOD_DIFF_09 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff").read_text(encoding="utf-8")
 ID_EXPRESSION = "createHash('sha256').update(`capture-${orderId}`).digest('hex')"
 
@@ -79,6 +80,29 @@ def test_bug_02_rejects_reference_and_invoice_ids_regenerated_inside_retry_loop(
     assert any("same order body on every retry" in p for p in _bug_02_problems(unsafe))
 
 
+def test_bug_04_original_random_invoice_is_rejected():
+    original = (SHOP / "src/checkout.ts").read_text(encoding="utf-8")
+    assert check_patched("BUG-04", original)
+
+
+def test_bug_04_reference_fix_has_stable_distinct_cart_identity(tmp_path):
+    patched = (apply_to_copy(GOOD_DIFF_04, SHOP, tmp_path / "bug04") / "src/checkout.ts").read_text(encoding="utf-8")
+    assert check_patched("BUG-04", patched) == []
+
+
+def test_bug_04_accepts_reference_variable_derived_from_cart(tmp_path):
+    patched = (apply_to_copy(GOOD_DIFF_04, SHOP, tmp_path / "bug04-reference-var") / "src/checkout.ts").read_text(encoding="utf-8")
+    patched = patched.replace("  const invoiceId =", "  const referenceId = `cart-${cartId}`;\n  const invoiceId =")
+    patched = patched.replace("referenceId: cartId,", "referenceId,")
+    assert check_patched("BUG-04", patched) == []
+
+
+def test_bug_04_rejects_timestamp_or_amount_only_identity(tmp_path):
+    patched = (apply_to_copy(GOOD_DIFF_04, SHOP, tmp_path / "bug04-unsafe") / "src/checkout.ts").read_text(encoding="utf-8")
+    assert check_patched("BUG-04", patched.replace("crypto.randomUUID()", "Date.now()"))
+    assert check_patched("BUG-04", patched.replace("`${cartId}:${finalAmount}`", "`${finalAmount}`"))
+
+
 @pytest.fixture
 def patched(tmp_path):
     return (apply_to_copy(GOOD_DIFF, SHOP, tmp_path / "p") / "src" / "checkout.ts").read_text(encoding="utf-8")
@@ -129,7 +153,7 @@ def test_a_differently_named_variable_is_followed(patched):
 
 def test_bugs_without_a_check_are_reported_as_such(patched):
     with pytest.raises(KeyError):
-        check_patched("BUG-04", patched)
+        check_patched("BUG-05", patched)
 
 
 def test_bug_03_curated_fix_keeps_declined_order_unpaid(tmp_path):

@@ -155,6 +155,13 @@ def test_verified_role_c_bug_02_patch_is_the_first_fallback_candidate():
     assert known_fix_candidates("BUG-02")[0] == expected
 
 
+def test_verified_role_c_bug_04_patch_is_the_first_fallback_candidate():
+    from ai.fixer import known_fix_candidates
+
+    expected = ROOT / "ai" / "fixer" / "known_fixes" / "BUG-04.diff"
+    assert known_fix_candidates("BUG-04")[0] == expected
+
+
 def test_role_c_bug_09_patch_is_the_first_fallback_candidate():
     from ai.fixer import known_fix_candidates
 

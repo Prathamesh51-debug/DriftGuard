@@ -165,6 +165,39 @@ def check_bug_03(source: str) -> List[str]:
     return problems
 
 
+def check_bug_04(source: str) -> List[str]:
+    """BUG-04: stable invoice for a cart, distinct invoices for equal-price purchases."""
+    code = _strip_comments(source)
+    handler = re.search(r"export\s+async\s+function\s+createCheckoutOrder\s*\(", code)
+    if not handler:
+        return ["the order-creation handler was not found"]
+    create_code = re.split(r"\nexport\s+(?:async\s+)?function\s+", code[handler.end():], maxsplit=1)[0]
+    loop = re.search(r"\bwhile\s*\([^)]*\battempts\b[^)]*\)\s*\{", create_code)
+    call = re.search(r"ordersController\.createOrder\s*\(\s*\{([\s\S]*?)\}\s*\)", create_code)
+    if not loop or not call:
+        return ["the createOrder retry call was not found"]
+    args = call.group(1)
+    cart = re.search(r"\bconst\s+cartId\s*=\s*([^;]+);", create_code)
+    invoice = re.search(r"\bconst\s+invoiceId\s*=\s*([^;]+);", create_code)
+    problems = []
+    if not cart or cart.start() > loop.start() or not re.search(r"options\?\.cartId|options\.cartId", cart.group(1)) or not re.search(r"\brandomUUID\s*\(", cart.group(1)):
+        problems.append("cart identity must use a supplied cartId or a new UUID before retries")
+    if not invoice or invoice.start() > loop.start() or not all(part in invoice.group(1) for part in ("createHash", "cartId", "finalAmount")):
+        problems.append("invoice ID must hash cart identity and final amount before retries")
+    if not re.search(r"\binvoiceId\s*(?:,|:\s*invoiceId\b)", args):
+        problems.append("createOrder does not use the stable invoice ID")
+    ref_direct = re.search(r"\breferenceId\s*:\s*cartId\b", args)
+    ref_variable = re.search(r"\bconst\s+referenceId\s*=\s*([^;]+);", create_code)
+    ref_stable = bool(
+        ref_variable and ref_variable.start() < loop.start()
+        and "cartId" in ref_variable.group(1)
+        and re.search(r"\breferenceId\s*(?:,|:\s*referenceId\b)", args)
+    )
+    if not ref_direct and not ref_stable:
+        problems.append("the order reference must use the same cart identity")
+    return problems
+
+
 def check_bug_09(source: str) -> List[str]:
     """BUG-09: duplicate webhook IDs must short-circuit before any ledger side effect."""
     code = _strip_comments(source)
@@ -255,6 +288,7 @@ CHECKS: Dict[str, Callable[[str], List[str]]] = {
     "BUG-01": check_bug_01,
     "BUG-02": check_bug_02,
     "BUG-03": check_bug_03,
+    "BUG-04": check_bug_04,
     "BUG-09": check_bug_09,
 }
 

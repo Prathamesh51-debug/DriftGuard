@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BUGS_FILE = REPO_ROOT / "targets" / "demo-shop" / "bugs.yaml"
 # Curated fixes, tried in this order unless a fault has a verified Role C fallback.
 BUNDLED_FIX_DIR = Path(__file__).resolve().parent / "known_fixes"
-ROLE_C_PATCH_FIRST = {"BUG-01", "BUG-02", "BUG-09"}
+ROLE_C_PATCH_FIRST = {"BUG-01", "BUG-02", "BUG-04", "BUG-09"}
 KNOWN_FIX_DIRS = [REPO_ROOT / "targets" / "known-fixes", BUNDLED_FIX_DIR]
 
 

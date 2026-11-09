@@ -13,7 +13,7 @@ diff --git a/src/checkout.ts b/src/checkout.ts
    const returnUrl = process.env.PAYPAL_RETURN_URL || 'http://localhost:3000/return';
    const cancelUrl = process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/cancel';
    const { finalAmount, currency } = calculateOrderAmount(amount, options);
-+  const cartId = options?.cartId || `cart-${Date.now()}`;
++  const cartId = options?.cartId || `cart-${crypto.randomUUID()}`;
 +  const invoiceId = `INV-${crypto.createHash('sha256').update(`${cartId}:${finalAmount}`).digest('hex').substring(0, 16).toUpperCase()}`;
  
    let attempts = 0;
