@@ -47,6 +47,8 @@ Open `http://localhost:5173/` for the landing page or `/live` for stored engine 
 
 For the local red-to-green proof, set `DRIFTGUARD_ENABLE_FIX_RERUN=1` in `.env` before starting the engine. A failed run's **Generate and verify fix** action applies a server-generated diff to a disposable shop copy, builds it, makes a fresh Sandbox purchase through the proxy, and stores the patch hash and reconciled result in a child run. `DRIFTGUARD_LLM=none` uses the curated patch without a model call. Keep this setting off on public deployments: the patched Node process executes generated code and is not a security sandbox.
 
+The CLI uses that same engine API. From the repository root, run `python -m cli run F1` to launch a fault and wait for its verdict, `python -m cli report --all` to list stored runs, or `python -m cli report RUN_ID` to inspect one. A detected FAIL exits with code 1 by design; PASS exits 0 and an incomplete/error run exits 2. Reports for verified child runs include the patch source and SHA-256.
+
 ## Repository Structure
 * `/engine` - The MITM proxy, deterministic reconciler, and API orchestrator.
 * `/ai` - Tree-sitter AST scanner, scenario generator, and APIMatic fixer.

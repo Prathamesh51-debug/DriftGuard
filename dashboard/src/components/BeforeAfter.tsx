@@ -110,7 +110,8 @@ export function BeforeAfter({
         {proposal?.diff && (
           <section className="ba-diff">
             <h3>The fix</h3>
-            {proposal.explanation && <p className="muted">{proposal.explanation}</p>}
+            {after?.fix?.patch_sha256 && <p className="muted small mono">Patch SHA-256: {after.fix.patch_sha256}</p>}
+            {proposal.source === 'llm' && proposal.explanation && <p className="muted">{proposal.explanation}</p>}
             <DiffView diff={proposal.diff} />
           </section>
         )}

@@ -98,6 +98,15 @@ def test_falls_back_to_known_fix_after_three_failures(failing, scenario, bug):
     assert proposal.applies and proposal.source == "known_fix" and len(llm.calls) == 3
 
 
+def test_offline_curated_fix_does_not_claim_failed_model_attempts(failing, scenario, bug):
+    from ai.fixer.providers import OfflineLLM
+
+    proposal = propose_fix(failing, scenario, bug, SHOP, OfflineLLM(), known_fixes=[KNOWN_FIX])
+    assert proposal.applies and proposal.source == "known_fix"
+    assert proposal.attempts == 0
+    assert "without a model call" in proposal.explanation
+
+
 def test_gives_up_cleanly_when_nothing_applies(failing, scenario, bug):
     proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM(["nope"] * 3), known_fixes=[])
     assert not proposal.applies and proposal.diff is None and proposal.attempts == 3

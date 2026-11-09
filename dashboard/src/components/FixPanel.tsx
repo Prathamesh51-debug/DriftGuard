@@ -15,7 +15,7 @@ export function DiffView({ diff }: { diff: string }) {
 }
 
 function origin(p: FixProposal): string {
-  return p.source === 'llm' ? `Written by ${p.provider ?? 'the model'}, checked by code` : 'Curated fix (no model answer passed the checks)'
+  return p.source === 'llm' ? `Written by ${p.provider ?? 'the model'}, checked by code` : 'Curated fix selected by code'
 }
 
 export function FixPanel({ state, onRetry }: { state: FixState; onRetry: () => void }) {
@@ -58,7 +58,7 @@ export function FixPanel({ state, onRetry }: { state: FixState; onRetry: () => v
         </span>
         <span className="muted small">{origin(p)}</span>
       </div>
-      {p.explanation && <p>{p.explanation}</p>}
+      {p.source === 'llm' && p.explanation && <p>{p.explanation}</p>}
       <p className="muted small mono">
         {p.files.join(', ')} · {p.lines_changed} lines changed
       </p>

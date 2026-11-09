@@ -316,7 +316,7 @@ export function RunDetailPage({
   }
 
   const { result, scenario } = run
-  const cliCommand = `python -m cli run ${scenario.fault.split('_')[0]}`
+    const cliCommand = `python -m cli run ${scenario.fault.split('_')[0]}`
   const rerun = runs.find((candidate) => candidate.rerun_of === run.run_id)
   const parent = run.rerun_of ? runs.find((candidate) => candidate.run_id === run.rerun_of) : undefined
   const comparisonBefore = parent ? parent : run
@@ -414,7 +414,13 @@ export function RunDetailPage({
 
       {tab === 'fix' && (
         <div className="s02-detail-panel">
-          {!failed ? <p className="muted">A fix proposal is available for failed runs.</p> : (
+          {run.fix?.proposal ? (
+            <>
+              <p className="s02-lead">This exact patch ran in a disposable shop copy. The reconciler returned <strong>{result?.verdict ?? 'no verdict yet'}</strong>.</p>
+              <p className="muted small mono">Patch SHA-256: {run.fix.patch_sha256}</p>
+              <FixPanel state={{ status: 'ready', proposal: run.fix.proposal }} onRetry={onPropose} />
+            </>
+          ) : !failed ? <p className="muted">A fix proposal is available for failed runs.</p> : (
             <>
               <p className="s02-lead">The Fixer proposes a patch. DriftGuard checks it before showing it.</p>
               {fix ? <FixPanel state={fix} onRetry={onPropose} /> : <button className="btn btn-primary" type="button" onClick={onPropose}>Propose fix</button>}

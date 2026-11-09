@@ -64,11 +64,14 @@ def propose_fix(
     shop_dir = Path(shop_dir)
     source = (shop_dir / bug.file).read_text(encoding="utf-8")
     error: Optional[str] = None
+    attempts_used = 0
 
     for attempt in range(1, max_attempts + 1):
         try:
             raw = llm.complete(SYSTEM_PROMPT, build_user_prompt(result, scenario, bug, source, error))
+            attempts_used = attempt
         except LLMError as exc:  # every provider is down: skip straight to the curated patch
+            attempts_used = 0 if getattr(llm, "name", None) == "offline" else attempt
             error = f"No model available: {exc}"
             break
         try:
@@ -93,9 +96,11 @@ def propose_fix(
         if check.ok:
             return FixProposal(
                 bug_id=bug.id, applies=True, source="known_fix", diff=diff,
-                explanation=f"Model attempts failed; used the curated fix {Path(path).name}.",
-                files=check.files, lines_changed=check.lines_changed, attempts=max_attempts,
+                explanation=(f"Selected curated fix {Path(path).name} without a model call."
+                             if attempts_used == 0 else
+                             f"Model attempts failed; used the curated fix {Path(path).name}."),
+                files=check.files, lines_changed=check.lines_changed, attempts=attempts_used,
             )
         error = f"{error} Curated fix {Path(path).name} does not apply: {check.error}"
 
-    return FixProposal(bug_id=bug.id, applies=False, source="llm", attempts=max_attempts, error=error)
+    return FixProposal(bug_id=bug.id, applies=False, source="llm", attempts=attempts_used, error=error)

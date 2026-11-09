@@ -24,6 +24,8 @@ from .render import exit_code, fault_label, render_list, render_report
 DEFAULT_API = "http://localhost:8000"
 POLL_SECONDS = 1.0
 DEFAULT_TIMEOUT_S = 180
+FAULT_ALIASES = {fault.value.split("_")[0]: fault.value for fault in FaultType}
+FAULT_CHOICES = sorted(set(FAULT_ALIASES) | {fault.value for fault in FaultType})
 
 
 def wait_for_result(engine: Engine, run: Run, timeout_s: float, say: Callable[[str], None],
@@ -40,9 +42,13 @@ def wait_for_result(engine: Engine, run: Run, timeout_s: float, say: Callable[[s
 
 
 def cmd_run(engine: Engine, args, out: Callable[[str], None], err: Callable[[str], None]) -> int:
-    run = engine.launch(args.fault)
-    if args.fault and run.scenario.fault.value != args.fault:
-        raise EngineError(f"You asked for {args.fault}, but the engine ran {run.scenario.fault.value}. "
+    if args.fault and args.fault_option:
+        raise EngineError("Choose a fault either as `run F1` or `run --fault F1`, not both.")
+    requested = args.fault_option or args.fault
+    fault = FAULT_ALIASES.get(requested, requested) if requested else None
+    run = engine.launch(fault)
+    if fault and run.scenario.fault.value != fault:
+        raise EngineError(f"You asked for {fault}, but the engine ran {run.scenario.fault.value}. "
                           "It does not support that fault yet, so no verdict for it exists.")
     if not args.no_wait:
         run = wait_for_result(engine, run, args.timeout, err)
@@ -73,7 +79,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="start a chaos run and print the verdict")
-    run.add_argument("--fault", choices=[f.value for f in FaultType], help="which fault to inject (default: the engine's default, F1)")
+    run.add_argument("fault", nargs="?", choices=FAULT_CHOICES, help="fault code, e.g. F1 or F3_FORCED_DECLINE")
+    run.add_argument("--fault", dest="fault_option", choices=FAULT_CHOICES,
+                     help="which fault to inject (default: the engine's default, F1)")
     run.add_argument("--no-wait", action="store_true", help="start the run and print its current state without waiting")
     run.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_S, help="seconds to wait for the verdict (default %(default)s)")
     run.add_argument("--json", action="store_true", help="print the run as JSON")

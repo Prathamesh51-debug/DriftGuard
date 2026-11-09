@@ -21,6 +21,7 @@ class Run(BaseModel):
     scenario: Scenario
     result: Optional[Result] = None
     rerun_of: Optional[str] = None
+    fix: Optional[dict] = None
 
 
 class Engine:

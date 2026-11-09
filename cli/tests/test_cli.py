@@ -20,9 +20,9 @@ PASS = json.loads((FIXTURES / "f1_result_pass.json").read_text(encoding="utf-8")
 ERROR = {**FAIL, "verdict": "ERROR", "rule": "target_reachable", "error_message": "HTTPConnectionPool(host='localhost', port=3001): refused"}
 
 
-def run_json(run_id="run_aaaa1111", result=None, created_at=100.0, rerun_of=None, scenario=SCENARIO):
+def run_json(run_id="run_aaaa1111", result=None, created_at=100.0, rerun_of=None, scenario=SCENARIO, fix=None):
     return {"run_id": run_id, "status": "complete" if result else "running", "created_at": created_at,
-            "scenario": scenario, "result": result, "rerun_of": rerun_of}
+            "scenario": scenario, "result": result, "rerun_of": rerun_of, "fix": fix}
 
 
 class Reply:
@@ -107,6 +107,20 @@ def test_asking_for_a_fault_the_engine_did_not_run_is_an_error_not_a_silent_f1(c
     assert cli(s, "run", "--fault", "F3_FORCED_DECLINE") == 2
     assert s.calls[0][2] == {"fault": "F3_FORCED_DECLINE"}
     assert "asked for F3_FORCED_DECLINE" in capsys.readouterr().err
+
+
+def test_short_fault_code_resolves_to_the_full_engine_fault(capsys):
+    s = FakeSession({("POST", "/runs"): (201, run_json(result=FAIL))})
+    assert cli(s, "run", "F1") == 1
+    assert s.calls[0][2] == {"fault": "F1_LOST_CAPTURE_RESPONSE"}
+
+
+def test_verified_run_report_preserves_patch_identity(capsys):
+    fix = {"patch_sha256": "a" * 64, "proposal": {"bug_id": "BUG-01", "source": "known_fix"}}
+    s = FakeSession({("GET", "/runs/run_ab12cd34"): (200, run_json("run_ab12cd34", PASS, fix=fix))})
+    assert cli(s, "report", "ab12cd34") == 0
+    out = capsys.readouterr().out
+    assert "BUG-01 (known_fix)" in out and "a" * 64 in out
 
 
 def test_an_errored_run_explains_itself_and_shows_no_numbers(capsys):

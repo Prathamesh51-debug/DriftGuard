@@ -44,6 +44,10 @@ def render_report(run: Run) -> str:
     ]
     if run.rerun_of:
         lines.append(f"Re-run of: {short_id(run.rerun_of)}")
+    if run.fix and run.fix.get("patch_sha256"):
+        proposal = run.fix.get("proposal") or {}
+        lines.append(f"Patch:     {proposal.get('bug_id', 'unknown')} ({proposal.get('source', 'unknown')})")
+        lines.append(f"SHA-256:   {run.fix['patch_sha256']}")
     if res is None:
         return "\n".join(lines + ["", f"Status:    {run.status.upper()}. No verdict yet."])
 

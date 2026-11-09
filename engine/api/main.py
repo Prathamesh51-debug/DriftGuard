@@ -27,7 +27,10 @@ DEFAULT_SCENARIO = Scenario.model_validate_json(
 _extra_origins = [
     o.strip() for o in os.getenv("DRIFTGUARD_CORS_ORIGINS", "").split(",") if o.strip()
 ]
-CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"] + _extra_origins
+CORS_ORIGINS = [
+    "http://localhost:5173", "http://127.0.0.1:5173",
+    "http://localhost:3000", "http://127.0.0.1:3000",
+] + _extra_origins
 
 
 class Run(BaseModel):

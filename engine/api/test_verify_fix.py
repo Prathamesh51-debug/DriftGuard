@@ -57,3 +57,15 @@ def test_fix_execution_is_opt_in(tmp_path, monkeypatch):
     monkeypatch.delenv("DRIFTGUARD_ENABLE_FIX_RERUN", raising=False)
     with TestClient(main.app) as client:
         assert client.post("/runs/nonexistent/verify-fix").status_code == 503
+
+
+def test_both_local_frontend_hostnames_can_read_the_api(tmp_path, monkeypatch):
+    monkeypatch.setattr(database, "SQLITE_DB_PATH", tmp_path / "runs.db")
+    monkeypatch.setattr(database.db, "use_postgres", False)
+    with TestClient(main.app) as client:
+        for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+            response = client.options("/runs", headers={
+                "Origin": origin, "Access-Control-Request-Method": "GET",
+            })
+            assert response.status_code == 200
+            assert response.headers["access-control-allow-origin"] == origin
