@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from ai.common.llm import ScriptedLLM
 from ai.common.providers import OfflineLLM, SpendGuard
-from ai.service.app import ModelBackend, app, get_backend, get_fix_llm
+from ai.service.app import ModelBackend, app, get_backend, get_fix_llm, get_shop_dir
 
 
 class FakeClient:
@@ -159,9 +159,9 @@ def test_fix_refuses_a_run_that_did_not_fail(fixer):
     assert resp.status_code == 422 and "PASS" in resp.json()["detail"]
 
 
-def test_fix_says_so_when_the_bug_is_not_seeded_in_the_shop_yet(fixer):
-    other = {**SCENARIO, "fault": "F7_PROMPT_INJECTION"}  # BUG-10 is only a dormant entry: no source file yet
-    resp = fixer(OfflineLLM()).post("/fix", json={"scenario": other, "result": FAIL})
+def test_fix_says_so_when_the_bug_source_is_missing_from_the_shop(fixer, tmp_path):
+    app.dependency_overrides[get_shop_dir] = lambda: tmp_path
+    resp = fixer(OfflineLLM()).post("/fix", json={"scenario": SCENARIO, "result": FAIL})
     assert resp.status_code == 404 and "not seeded" in resp.json()["detail"]
 
 
