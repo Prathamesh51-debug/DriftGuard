@@ -1,0 +1,27 @@
+{
+  "scenario_id": "f4-duplicate-invoice-001",
+  "verdict": "PASS",
+  "rule": "app_recorded_captures == captures",
+  "observed": {
+    "captures": 1,
+    "amount_captured": "77.94",
+    "orders_created": 1,
+    "refunds_issued": 0,
+    "app_recorded_captures": 1
+  },
+  "evidence": {
+    "paypal_order_ids": [
+      "6K6642470P812644C"
+    ],
+    "paypal_capture_ids": [
+      "9T017761EP915510X"
+    ],
+    "paypal_refund_ids": [],
+    "proxy_log_refs": [
+      "hash_e3b0c44298fc"
+    ],
+    "webhook_event_ids": []
+  },
+  "money_impact": "clean: deterministic cart-hashed invoice ID reconciled cleanly",
+  "error_message": null
+}

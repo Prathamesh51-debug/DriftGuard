@@ -1,0 +1,14 @@
+{
+  "bug_id": "BUG-04",
+  "applies": true,
+  "source": "llm",
+  "provider": "anthropic",
+  "diff": "--- a/src/checkout.ts\n+++ b/src/checkout.ts\n@@ -12,6 +12,7 @@\n import { CheckoutPaymentIntent, PaypalExperienceUserAction } from '@paypal/paypal-server-sdk';\n import { ordersController } from './paypal';\n import { shopState } from './state';\n+import { createHash, randomUUID } from 'crypto';\n \n export interface CreateOrderResult {\n   orderId: string;\n@@ -82,6 +83,9 @@\n   const returnUrl = process.env.PAYPAL_RETURN_URL || 'http://localhost:3000/return';\n   const cancelUrl = process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/cancel';\n   const { finalAmount, currency } = calculateOrderAmount(amount, options);\n+  const cartId = options?.cartId || randomUUID();\n+  const referenceId = `cart-${cartId}`;\n+  const invoiceId = `INV-${createHash('sha256').update(`${cartId}|${finalAmount}`).digest('hex')}`;\n \n   let attempts = 0;\n   const maxRetries = 1;\n@@ -95,10 +99,9 @@\n           intent: CheckoutPaymentIntent.Capture,\n           purchaseUnits: [\n             {\n-              referenceId: `cart-${Date.now()}`,\n+              referenceId,\n               description: 'Autonomous Agent Guardrails Subscription',\n-              // BUG-04: Non-deterministic random invoice ID\n-              invoiceId: `INV-${Math.floor(Math.random() * 1000000)}`,\n+              invoiceId,\n               amount: {\n                 currencyCode: currency,\n                 value: finalAmount,\n",
+  "explanation": "The invoice ID and reference ID were built from Math.random() and Date.now(), so they were not stable across retries or reconcilable with the cart. The fix derives the cart ID once per call (from options.cartId or a fresh UUID) and hashes it with the final amount with SHA-256 to form a deterministic invoice ID, reusing the same order body on retries.",
+  "files": [
+    "src/checkout.ts"
+  ],
+  "lines_changed": 9,
+  "attempts": 1,
+  "error": null
+}

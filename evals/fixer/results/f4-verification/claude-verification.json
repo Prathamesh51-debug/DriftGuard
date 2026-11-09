@@ -1,0 +1,25 @@
+{
+  "provider": "anthropic",
+  "configured_model": "claude-haiku-5-5",
+  "attempts": 1,
+  "source": "llm",
+  "cache_enabled": false,
+  "curated_fallback_enabled": false,
+  "typescript_build_passed": true,
+  "runtime_check_passed": true,
+  "static_check_problems": [],
+  "sandbox_results": {
+    "baseline": "FAIL",
+    "reference": "PASS",
+    "claude": "PASS",
+    "claude-second": "PASS"
+  },
+  "cumulative_spend_guard_usd": 0.153608,
+  "sha256_utf8_lf": {
+    "original_checkout": "46997ffbb6f65050bae7a2ac9e1fa356aeaa31c6dba327a23601a63f7f073310",
+    "f4_scenario": "21be66e55663beedba571b02a194d78349e2ac8458cd133f289c652907111b70",
+    "live_failing_result": "b364668a998f55edd2a8b763e4f1a6c83f698201c92ad9ceedc6ab57998cc2bf",
+    "accepted_patch": "8c3f94b1a03862facc881ef2a46c66ed1fe03ec1c6df53741912c61b7e51466c",
+    "patched_checkout": "230f6d212b139b183a0739b7eb83f0a56785b59d6d507699821c62029a50e5f3"
+  }
+}

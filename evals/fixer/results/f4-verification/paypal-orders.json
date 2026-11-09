@@ -1,0 +1,46 @@
+[
+  {
+    "label": "baseline",
+    "order_id": "4N356025LU2697540",
+    "invoice_id": "INV-389290",
+    "reference_id": "cart-1794211589535",
+    "order_amount": "38.97",
+    "capture_id": "6M879604EY721683L",
+    "capture_amount": "38.97",
+    "capture_status": "COMPLETED",
+    "reconciler_observed_amount": "38.97"
+  },
+  {
+    "label": "reference",
+    "order_id": "9HM608176H999552X",
+    "invoice_id": "INV-BFAE51C4744BDAD8",
+    "reference_id": "cart-57a64df4-da9e-441a-8911-13cf29e6f6fe",
+    "order_amount": "38.97",
+    "capture_id": "07X85504UR3064629",
+    "capture_amount": "38.97",
+    "capture_status": "COMPLETED",
+    "reconciler_observed_amount": "38.97"
+  },
+  {
+    "label": "claude",
+    "order_id": "01A97366K4559742E",
+    "invoice_id": "INV-2ff9fee464ac70add3a56b4054d65be2b862bff3d2cfbb0847246ef3efdc84b1",
+    "reference_id": "cart-9771d8cd-a5a1-4d86-8575-c10be21b1b91",
+    "order_amount": "38.97",
+    "capture_id": "79439823HD781452D",
+    "capture_amount": "38.97",
+    "capture_status": "COMPLETED",
+    "reconciler_observed_amount": "38.97"
+  },
+  {
+    "label": "claude-second",
+    "order_id": "6K6642470P812644C",
+    "invoice_id": "INV-144283611d2cc48b5efcc28a238750684c02132d4a5651238dd9c93e49e7143c",
+    "reference_id": "cart-b239254b-f18c-4e4f-85cc-45d3038c3f66",
+    "order_amount": "38.97",
+    "capture_id": "9T017761EP915510X",
+    "capture_amount": "38.97",
+    "capture_status": "COMPLETED",
+    "reconciler_observed_amount": "77.94"
+  }
+]
