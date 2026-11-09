@@ -1,0 +1,35 @@
+{
+  "bug_id": "BUG-03",
+  "scenario_id": "f3-capture-declined-001",
+  "patch_path": "evals\\fixer\\results\\model-patches\\BUG-03-anthropic.patch",
+  "patch_sha256": "0932825fafb4cf517505de17bdff6e1f88823e6ecb0d12390435a139d1f4fe39",
+  "source_sha256": "a43d213b0a57eb43de42e7059930cb95c095f81955b29a69496c73cb25dee51a",
+  "patch_accepted": true,
+  "elapsed_seconds": 23.5,
+  "applied_patch_sha256": "0932825fafb4cf517505de17bdff6e1f88823e6ecb0d12390435a139d1f4fe39",
+  "result": {
+    "scenario_id": "f3-capture-declined-001",
+    "verdict": "PASS",
+    "rule": "app_recorded_captures == captures",
+    "observed": {
+      "captures": 0,
+      "amount_captured": "0.00",
+      "orders_created": 1,
+      "refunds_issued": 0,
+      "app_recorded_captures": 0
+    },
+    "evidence": {
+      "paypal_order_ids": [
+        "45Y52510PJ0287714"
+      ],
+      "paypal_capture_ids": [],
+      "paypal_refund_ids": [],
+      "proxy_log_refs": [
+        "hash_e3b0c44298fc"
+      ],
+      "webhook_event_ids": []
+    },
+    "money_impact": "clean: PayPal declined, app correctly recorded 0 captures",
+    "error_message": null
+  }
+}

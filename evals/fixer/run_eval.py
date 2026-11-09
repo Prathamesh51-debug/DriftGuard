@@ -1,5 +1,5 @@
 """
-Fixer eval: run the Fixer N times on a bug and report how often it produces a correct fix.
+Fixer source eval: run the Fixer N times and measure patch acceptance and source checks.
 
     python -m evals.fixer.run_eval --runs 10 --providers anthropic
     python -m evals.fixer.run_eval --runs 5 --providers gemini,groq --save
@@ -7,7 +7,8 @@ Fixer eval: run the Fixer N times on a bug and report how often it produces a co
     python -m evals.fixer.run_eval --runs 10 --providers anthropic --blind --save          # no hints in the source
 
 Measures the model alone: the curated-fix fallback is off and the reply cache is off, so every
-run is a fresh sample. Paid providers go through the spend guard. Planner Ref: Part 8 (Fixer eval table).
+run is a fresh sample. Paid providers go through the spend guard. A source check is not a live
+PayPal Sandbox rerun; keep live verdicts in a separate report. Planner Ref: Part 8.
 """
 
 import argparse
@@ -122,9 +123,11 @@ def to_markdown(summary: Dict, providers: str) -> str:
     lines = [
         f"### Fixer eval: {summary['bug']} ({providers})",
         "",
-        "| Runs | Diff applies | Applies on first try | Behaves correctly | Avg seconds |",
+        "| Runs | Diff applies | Applies on first try | Source check passes | Avg generation seconds |",
         "|---|---|---|---|---|",
         f"| {n} | {summary['applies']}/{n} | {summary['first_try']}/{n} | {correct} | {summary['avg_seconds']} |",
+        "",
+        "Source checks only. Live PayPal Sandbox re-runs are reported separately.",
         "",
         "Answered by: " + (", ".join(f"{k} x{v}" for k, v in summary["providers"].items()) or "no model answered"),
     ]

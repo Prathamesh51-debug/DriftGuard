@@ -1,0 +1,27 @@
+--- a/src/checkout.ts
++++ b/src/checkout.ts
+@@ -190,15 +190,15 @@
+       const errStr = typeof errData === 'string' ? errData : JSON.stringify(errData);
+       const isAlreadyCaptured = errStr.includes('ORDER_ALREADY_CAPTURED');
+ 
+-      if (statusCode === 422 && !isAlreadyCaptured) {
+-        shopState.recordCaptureSuccess(orderId, undefined, '38.97');
+-        return {
+-          success: true,
+-          orderId,
+-          status: 'COMPLETED',
+-          attempts,
+-        };
+-      }
++      if (statusCode === 422 && !isAlreadyCaptured) {
++        return {
++          success: false,
++          orderId,
++          status: 'FAILED',
++          attempts,
++          error: 'INSTRUMENT_DECLINED',
++        };
++      }
+ 
+       // On 504 Gateway Timeout or network failure, blindly retry without idempotency key
+       if (statusCode === 504 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {

@@ -1,0 +1,153 @@
+{
+  "recorded_at_utc": "2026-11-09T08:53:56.071399+00:00",
+  "method": "stored engine API runs; separate PayPal Sandbox orders; proxy fault active",
+  "passing_verified_reruns": 4,
+  "attempted_verified_reruns": 4,
+  "runs": [
+    {
+      "fault": "F1",
+      "parent_run_id": "run_7c57cf96",
+      "child_run_id": "run_3a4ac1fb",
+      "before": {
+        "verdict": "FAIL",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 0
+        },
+        "paypal_order_ids": [
+          "4VV325896N2110045"
+        ]
+      },
+      "after": {
+        "verdict": "PASS",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 1
+        },
+        "paypal_order_ids": [
+          "0XF27555U2754735X"
+        ]
+      },
+      "patch": {
+        "bug_id": "BUG-01",
+        "source": "known_fix",
+        "sha256": "431b7d67286f0f30adf7347e06133490e43ea0a070480108bc25d1adc3c7865d"
+      }
+    },
+    {
+      "fault": "F2",
+      "parent_run_id": "run_ed40390f",
+      "child_run_id": "run_8783b452",
+      "before": {
+        "verdict": "FAIL",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 2,
+          "refunds_issued": 0,
+          "app_recorded_captures": 1
+        },
+        "paypal_order_ids": [
+          "3KV57241KX487414B",
+          "6H711214CC278754K"
+        ]
+      },
+      "after": {
+        "verdict": "PASS",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 1
+        },
+        "paypal_order_ids": [
+          "2BD205485Y877042A"
+        ]
+      },
+      "patch": {
+        "bug_id": "BUG-02",
+        "source": "known_fix",
+        "sha256": "4de539b85a88460ac407ff67f74e978b347be5c43c25fbfe42669e71e4dca13c"
+      }
+    },
+    {
+      "fault": "F3",
+      "parent_run_id": "run_46846457",
+      "child_run_id": "run_99ddee6a",
+      "before": {
+        "verdict": "FAIL",
+        "observed": {
+          "captures": 0,
+          "amount_captured": "0.00",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 1
+        },
+        "paypal_order_ids": [
+          "1YR13652YB272572H"
+        ]
+      },
+      "after": {
+        "verdict": "PASS",
+        "observed": {
+          "captures": 0,
+          "amount_captured": "0.00",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 0
+        },
+        "paypal_order_ids": [
+          "83D66781D08306807"
+        ]
+      },
+      "patch": {
+        "bug_id": "BUG-03",
+        "source": "known_fix",
+        "sha256": "2d2f3e7329b6cca53d88b1782e612bc25d32e8fc08f81ec30161f272dab6124e"
+      }
+    },
+    {
+      "fault": "F4",
+      "parent_run_id": "run_f965ce33",
+      "child_run_id": "run_7b6002ba",
+      "before": {
+        "verdict": "FAIL",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 0
+        },
+        "paypal_order_ids": [
+          "94Y98929U0326683S"
+        ]
+      },
+      "after": {
+        "verdict": "PASS",
+        "observed": {
+          "captures": 1,
+          "amount_captured": "38.97",
+          "orders_created": 1,
+          "refunds_issued": 0,
+          "app_recorded_captures": 1
+        },
+        "paypal_order_ids": [
+          "3MP65281XX047280J"
+        ]
+      },
+      "patch": {
+        "bug_id": "BUG-04",
+        "source": "known_fix",
+        "sha256": "75d0a0dc5391e74a2a5157914f1b6b763efde99f98beda086b36cb1028362a26"
+      }
+    }
+  ]
+}
