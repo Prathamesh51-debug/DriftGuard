@@ -51,7 +51,7 @@ services:
     name: driftguard-worker
     runtime: python
     region: oregon
-    plan: free
+    plan: starter
     buildCommand: pip install -r engine/requirements.txt && playwright install --with-deps chromium
     startCommand: python engine/orchestrator/worker.py
     envVars:
@@ -80,8 +80,6 @@ services:
   - type: web
     name: driftguard-dashboard
     runtime: static
-    region: oregon
-    plan: free
     buildCommand: cd dashboard && npm install && npm run build
     staticPublishPath: ./dashboard/dist
     routes:
