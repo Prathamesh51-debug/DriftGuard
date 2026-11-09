@@ -50,7 +50,7 @@ app.post(['/_driftguard/reset', '/driftguard/reset'], (_req: Request, res: Respo
  */
 app.post('/api/orders', async (req: Request, res: Response) => {
   try {
-    const amount = req.body?.amount || req.body?.subtotal || '38.97';
+    const amount = req.body?.subtotal || req.body?.amount || '38.97';
     const rawTax = req.body?.options?.taxRate ?? req.body?.tax_rate;
     const taxRate = rawTax !== undefined && rawTax !== null ? Number(rawTax) : undefined;
     const rawDiscount = req.body?.options?.discount ?? req.body?.discount;

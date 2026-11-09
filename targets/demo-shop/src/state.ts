@@ -69,6 +69,9 @@ class StateStore {
   public recordCaptureSuccess(orderId: string, captureId?: string, amount: string = '38.97'): void {
     const order = this.orders.get(orderId);
     if (order) {
+      if (captureId && order.captureIds.includes(captureId)) {
+        return;
+      }
       order.status = 'COMPLETED';
       order.captureCount += 1;
       if (captureId) {
