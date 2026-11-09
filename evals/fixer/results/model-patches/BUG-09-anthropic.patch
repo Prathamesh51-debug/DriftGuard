@@ -1,0 +1,23 @@
+--- a/src/webhooks.ts
++++ b/src/webhooks.ts
+@@ -1,4 +1,6 @@
+ import { Request, Response } from 'express';
+ import { shopState } from './state';
++
++const processedEventIds = new Set<string>();
+ 
+ export interface WebhookEvent {
+@@ -52,7 +54,11 @@
+   // BUG-09: Duplicate webhook event processing
+   // Vulnerability: Missing deduplication check against processed_events
+   // Replayed webhook events process multiple times without idempotency check
+-  const isDuplicate = false;
++  const isDuplicate = processedEventIds.has(event.id);
++  if (isDuplicate) {
++    res.status(200).json({ status: 'DUPLICATE_IGNORED', eventId: event.id, eventType: event.event_type, duplicate: true });
++    return;
++  }
++  processedEventIds.add(event.id);
+ 
+   shopState.recordWebhookEvent(event.id, event.event_type, isDuplicate);
+ 

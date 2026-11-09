@@ -28,9 +28,10 @@ range as a latency benchmark.
 
 ## Model-generated patches
 
-The model-only evaluation disables curated fallback and cache. Its source
-checks measure whether a generated diff applies and matches fault-specific
-checks; they do **not** prove a live Sandbox outcome.
+The model-only evaluation disables curated fallback and cache. Its historical
+source checks measure whether a generated diff applies and matches the checks
+used for that evaluation; they do **not** prove acceptance by the current
+product gate or a live Sandbox outcome.
 
 | Bug | Fresh model samples passing source checks | Avg model generation | Live model patch evidence |
 |---|---:|---:|---|
@@ -43,6 +44,18 @@ The BUG-03 source check table is `BUG-03-anthropic.md`. Its archived patch is
 new model call using `verify_saved_patch.py`; `f3-verification/claude-live.json`
 records its hash, source hash, PayPal order, observed state and 23.5-second
 build-and-run time. BUG-01 and BUG-09 source tables are separate artifacts.
+
+An archived BUG-01 Claude candidate (SHA-256
+`935c07a418bd5226a2a66c3e2e02b9da7f799a740e9897135fea4ee6c3cbc673`)
+was replayed through the current product verifier. Its diff applied, but the
+behavior gate rejected it before build or Sandbox execution: it adds a stable
+`paypalRequestId` without checking PayPal order status after an ambiguous
+capture error. Thus the historical BUG-01 `10/10` source-check result is not
+a live fix pass rate. An archived BUG-09 candidate also applies, but its
+current behavior check rejects it because a capture webhook can repeat a
+capture already recorded by checkout. No live model-patch PASS is claimed for
+BUG-01 or BUG-09. The rejected BUG-09 candidate's SHA-256 is
+`1bbe1d7e752850d548add3ce4f4bbf7b44a5355b3aeb8e9961fa56223d6c0b43`.
 
 Earlier direct live tests of one Claude-generated patch each for BUG-02 and
 BUG-04 passed; see `f2-verification/README.md` and
