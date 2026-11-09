@@ -106,9 +106,11 @@ def extract_app_captures(app_state: Optional[Dict[str, Any]], order_id: str) -> 
     """Extract recorded capture count for an order from target app state."""
     if not app_state:
         return None
-    for order in app_state.get("orders", []):
-        if order.get("orderId") == order_id:
-            return order.get("captureCount")
+    if isinstance(app_state.get("orders"), list):
+        for order in app_state["orders"]:
+            if order.get("orderId") == order_id:
+                return order.get("captureCount")
+        return None
     return app_state.get("totalCapturesRecorded", 0)
 
 
@@ -407,15 +409,11 @@ def reconcile_order(
         scenario, ledger, app_state, order_id, created_orders
     )
 
-    # 5. Construct ObservedState (Generic: derives directly from ledger & harvested orders)
-    effective_captures = max(len(ledger["captures"]), app_captures if app_captures is not None else 0)
+    # 5. Observed captures and amount describe this PayPal order only. The
+    # app's separate count must never overwrite PayPal ground truth, and its
+    # all-orders total must never inflate this order's captured amount.
+    effective_captures = len(ledger["captures"])
     effective_amount = ledger["total_captured_amount"]
-    if app_state and app_state.get("totalCapturedAmount"):
-        try:
-            if Decimal(app_state["totalCapturedAmount"]) > Decimal(effective_amount):
-                effective_amount = app_state["totalCapturedAmount"]
-        except Exception:
-            pass
 
     refunds_count = max(len(ledger["refunds"]), app_state.get("totalRefundsIssued", 0) if app_state else 0)
 

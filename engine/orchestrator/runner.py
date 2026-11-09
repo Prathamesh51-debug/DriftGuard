@@ -100,7 +100,7 @@ def run_scenario(
     target_shop_url: str = "http://localhost:3001",
     proxy_url: str = "http://localhost:8080",
     max_retries: int = 1,
-    scope_proxy_log: bool = False,
+    scope_proxy_log: bool = True,
 ) -> Result:
     """
     Executes an end-to-end chaos test run on a target shop:
@@ -224,7 +224,7 @@ def run_scenario(
             with scoped_path.open("wb") as scoped:
                 if audit_path.exists():
                     with audit_path.open("rb") as shared:
-                        shared.seek(audit_offset)
+                        shared.seek(audit_offset if audit_path.stat().st_size >= audit_offset else 0)
                         scoped.write(shared.read())
             result = reconcile_order(scenario=scenario, order_id=order_id,
                                      demo_shop_url=shop_base, log_path=scoped_path)
