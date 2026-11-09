@@ -118,3 +118,26 @@ def test_text_about_the_app_record_is_checked_like_any_other_figure(failing, sce
     good = "PayPal shows 1 capture of 38.97 USD, but the app recorded 0 captures."
     assert verify_text([good], failing, scenario) == []
     assert verify_text(["The app recorded 3 captures."], failing, scenario) == ["number 3 is not in the result"]
+
+
+def test_declined_payment_template_does_not_claim_paypal_took_money():
+    scenario = load(Scenario, "f3_scenario.json")
+    failing = load(Result, "f3_result_fail.json")
+    out = template_explanation(failing, scenario)
+    assert "app recorded a payment PayPal did not confirm" in out.headline
+    assert "PayPal took" not in " ".join((out.headline, out.what_happened))
+    assert verify_text([out.headline, out.what_happened, out.impact], failing, scenario) == []
+
+
+def test_fixture_delay_attached_to_ms_is_not_a_measured_result():
+    scenario = load(Scenario, "f2_scenario.json")
+    failing = load(Result, "f2_result_fail.json")
+    assert "number 6000 is not in the result" in verify_text(
+        ["The test delayed PayPal by 6000ms."], failing, scenario)
+
+
+def test_synthetic_f4_response_cannot_be_described_as_real_collision():
+    scenario = load(Scenario, "f4_scenario.json")
+    failing = load(Result, "f4_result_fail.json")
+    assert "PayPal duplicate-invoice collision is not evidenced by this result" in verify_text(
+        ["PayPal detected a duplicate invoice ID collision."], failing, scenario)

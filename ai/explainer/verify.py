@@ -11,6 +11,7 @@ from typing import Iterable, List, Set
 from contracts import Result, Scenario
 
 NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?!\w)")
+ATTACHED_UNIT_NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?=(?:ms|milliseconds|seconds|USD)\b)", re.IGNORECASE)
 PAYPAL_ID = re.compile(r"\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{12,}\b")
 PROXY_REF = re.compile(r"\breq_[0-9a-z]+\b")
 
@@ -59,9 +60,15 @@ def verify_text(texts: Iterable[str], result: Result, scenario: Scenario) -> Lis
 
     allowed = known_numbers(result, scenario)
     seen = set()
-    for token in NUMBER.findall(text):
+    for token in NUMBER.findall(text) + ATTACHED_UNIT_NUMBER.findall(text):
         value = Decimal(token)
         if value not in allowed and token not in seen:
             seen.add(token)
             problems.append(f"number {token} is not in the result")
+    # F4's mock response is injected by the local proxy. Neither a fault name
+    # nor capture counts establish a real PayPal duplicate-invoice rejection.
+    if scenario.fault.value == "F4_DUPLICATE_INVOICE" and re.search(
+        r"\b(?:duplicate.invoice|invoice collision)\b", text, re.IGNORECASE
+    ):
+        problems.append("PayPal duplicate-invoice collision is not evidenced by this result")
     return problems

@@ -1,0 +1,66 @@
+{
+  "recorded_at_utc": "2026-11-09T13:34:44.917027+00:00",
+  "method": "fresh Anthropic replies on stored live FAIL results, reply cache off, strict code grounding",
+  "runs": 4,
+  "first_pass_without_regeneration": 4,
+  "accepted_after_regeneration": 0,
+  "template_fallbacks": 0,
+  "grounded_final_outputs": 4,
+  "avg_seconds": 3.6,
+  "spend_guard_usd_before": 0.154658,
+  "spend_guard_usd_after": 0.155893,
+  "rows": [
+    {
+      "run_id": "run_7c57cf96",
+      "fault": "F1_LOST_CAPTURE_RESPONSE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 3.7,
+      "grounding_problems": [],
+      "headline": "Buyer charged 38.97 USD, but app recorded no capture",
+      "what_happened": "This test was set up to simulate a lost capture response, which is a test plan and not proof that PayPal returned an error. PayPal's records show one capture (4LX275891M524005R) for 38.97 USD on order 4VV325896N2110045, but the app's records show zero captures where one was expected.",
+      "impact": "The buyer was charged 38.97 USD, the app did not record the payment, and no refunds were issued, so the money was paid without fulfillment."
+    },
+    {
+      "run_id": "run_0c90e05d",
+      "fault": "F2_SLOW_PAYPAL",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 4.8,
+      "grounding_problems": [],
+      "headline": "Test failed: two PayPal orders created for one purchase",
+      "what_happened": "This run used the slow PayPal fault scenario, which is a test plan rather than confirmation that a delay occurred. PayPal's records show two orders created for one purchase, while the expected count was one. PayPal also recorded one capture for 38.97 USD, which matches the expected amount and the app's own record of one capture.",
+      "impact": "The customer was charged 38.97 USD once, but no refunds were issued, and a second PayPal order (84190020YU056590B) exists for the same purchase."
+    },
+    {
+      "run_id": "run_46846457",
+      "fault": "F3_FORCED_DECLINE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 2.7,
+      "grounding_problems": [],
+      "headline": "App wrongly recorded a declined payment as successful",
+      "what_happened": "This forced-decline test expected no captured payment, and PayPal's records show zero captures totaling 0.00 USD for order 1YR13652YB272572H. The app's own records show one capture, so it marked a declined payment as successful. The test verdict is FAIL.",
+      "impact": "The app recorded a fulfilled payment that PayPal never captured, so the customer may have received a product or service without any payment being collected."
+    },
+    {
+      "run_id": "run_c7a3a466",
+      "fault": "F4_DUPLICATE_INVOICE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 3.2,
+      "grounding_problems": [],
+      "headline": "Test failed: app missed a PayPal capture of 38.97 USD",
+      "what_happened": "The test simulated a failure in the invoice response. PayPal's records show one capture (ID 51M09156HK562274H) for 38.97 USD on order 4NE6391236975410U, but the app's own records show zero captures, while the test expected one capture of 38.97. No refunds were issued.",
+      "impact": "The customer was charged 38.97 USD by PayPal, but the app did not record that payment, so the app's records disagree with PayPal's for this order."
+    }
+  ]
+}

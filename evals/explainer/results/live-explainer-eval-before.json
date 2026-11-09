@@ -1,0 +1,66 @@
+{
+  "recorded_at_utc": "2026-11-09T13:31:18.457807+00:00",
+  "method": "fresh Anthropic replies on stored live FAIL results, reply cache off, strict code grounding",
+  "runs": 4,
+  "first_pass_without_regeneration": 4,
+  "accepted_after_regeneration": 0,
+  "template_fallbacks": 0,
+  "grounded_final_outputs": 4,
+  "avg_seconds": 4.0,
+  "spend_guard_usd_before": 0.153608,
+  "spend_guard_usd_after": 0.154658,
+  "rows": [
+    {
+      "run_id": "run_7c57cf96",
+      "fault": "F1_LOST_CAPTURE_RESPONSE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 2.2,
+      "grounding_problems": [],
+      "headline": "Buyer charged 38.97 USD but app recorded no capture",
+      "what_happened": "The test forwarded a capture to the PayPal sandbox and PayPal created capture 4LX275891M524005R for 38.97 USD against order 4VV325896N2110045, so the buyer was charged. The app's own records show 0 captures, while the expected count was 1 capture of 38.97, so the app did not record a payment that PayPal completed.",
+      "impact": "The buyer has been charged 38.97 USD and no refund was issued, so this amount was paid without fulfillment."
+    },
+    {
+      "run_id": "run_ed40390f",
+      "fault": "F2_SLOW_PAYPAL",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 6.0,
+      "grounding_problems": [],
+      "headline": "Delayed checkout created a duplicate PayPal order",
+      "what_happened": "The test added a 6000ms delay to order creation to force a client timeout and a retry without an idempotency key. PayPal recorded two orders (3KV57241KX487414B and 6H711214CC278754K) but only one capture (459788096T9401204) for 38.97 USD, which matches the app's one recorded capture of 38.97. The rule expected exactly one order, so the test failed.",
+      "impact": "A single purchase produced a second PayPal order with no idempotency key, and no refunds were issued."
+    },
+    {
+      "run_id": "run_46846457",
+      "fault": "F3_FORCED_DECLINE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 2.0,
+      "grounding_problems": [],
+      "headline": "App marked a declined payment as captured; PayPal shows none",
+      "what_happened": "The test simulated an INSTRUMENT_DECLINED response when capturing order 1YR13652YB272572H, and the order should have stayed unpaid. PayPal's records show zero captures and 0.00 USD captured, with no capture IDs, but the app's own records show 1 capture. The app therefore falsely marked a declined payment as successful.",
+      "impact": "The app recorded a fulfilled payment of 0.00 USD in PayPal, so a customer could be fulfilled for an order PayPal never charged."
+    },
+    {
+      "run_id": "run_f965ce33",
+      "fault": "F4_DUPLICATE_INVOICE",
+      "source": "llm",
+      "provider": "anthropic",
+      "attempts": 1,
+      "rejected": [],
+      "seconds": 5.6,
+      "grounding_problems": [],
+      "headline": "Test failed: app missed a PayPal capture after invoice collision",
+      "what_happened": "This test injected a duplicate invoice ID collision to check deterministic cart hash invoice derivation. PayPal's records show 1 capture for 38.97 USD, but the app's own records show 0 captures, while 1 capture was expected. One order was created and no refunds were issued.",
+      "impact": "The invoice collision broke deterministic ledger reconciliation, so PayPal captured 38.97 USD that the app's records do not show."
+    }
+  ]
+}

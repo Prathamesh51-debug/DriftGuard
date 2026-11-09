@@ -46,8 +46,16 @@ def template_explanation(result: Result, scenario: Scenario, attempts: int = 0, 
     elif result.verdict == Verdict.ERROR:
         headline = "Test could not complete"
         what = result.error_message or "The test hit an error before PayPal's records could be checked."
-    elif obs.app_recorded_captures is not None and obs.app_recorded_captures != obs.captures:
-        headline = "PayPal took the payment but the app has no record of it"
+    elif obs.app_recorded_captures is not None and obs.app_recorded_captures > obs.captures:
+        headline = "The app recorded a payment PayPal did not confirm"
+        what = (
+            f"PayPal's records show {obs.captures} capture(s) totalling {obs.amount_captured} {expect.currency}, "
+            f"but the app's own records show {obs.app_recorded_captures}. Rule broken: {result.rule}."
+        )
+    elif obs.app_recorded_captures is not None and obs.app_recorded_captures < obs.captures:
+        headline = ("PayPal took the payment but the app has no record of it"
+                    if obs.app_recorded_captures == 0 else
+                    "The app recorded fewer captures than PayPal")
         what = (
             f"PayPal's records show {obs.captures} capture(s) totalling {obs.amount_captured} {expect.currency}, "
             f"but the app's own records show {obs.app_recorded_captures}. Rule broken: {result.rule}."
@@ -88,4 +96,4 @@ def explain(result: Result, scenario: Scenario, llm: LLMClient, *, max_attempts:
         feedback = "; ".join(problems)
         rejected.append(feedback)
 
-    return template_explanation(result, scenario, attempts=max_attempts, rejected=rejected)
+    return template_explanation(result, scenario, attempts=len(rejected), rejected=rejected)

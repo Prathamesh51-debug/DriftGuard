@@ -44,6 +44,7 @@ def test_this_orders_amount_ignores_older_shop_captures(monkeypatch, tmp_path):
     assert result.verdict == Verdict.PASS
     assert result.observed.captures == 1
     assert result.observed.amount_captured == "38.97"
+    assert "deterministic cart-hashed" not in result.money_impact
 
 
 def test_missing_order_does_not_use_unrelated_shop_count():

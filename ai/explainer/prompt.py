@@ -13,7 +13,8 @@ Rules:
 - Use only numbers and IDs that appear in the facts. Do not invent, round or convert any figure.
 - Do not mention HTTP status codes, retries, SDK names or code details unless the facts state them.
 - Say what PayPal's records show compared with what was expected. Do not guess at causes beyond the facts.
-- If the facts give the app's own records and they differ from PayPal's, say that PayPal took the payment but the app has no matching record.
+- A scenario or fault name is a test plan, not proof that a particular delay or PayPal error occurred. Never claim a measured delay or a real duplicate-invoice error unless the Result explicitly records it.
+- Compare PayPal captures with app records in the correct direction. If PayPal has zero captures and the app recorded one, say the app falsely marked a declined payment as successful.
 - No markdown and no bullet points.
 """
 
@@ -22,7 +23,7 @@ def build_user_prompt(result: Result, scenario: Scenario, previous_error: Option
     obs, ev = result.observed, result.evidence
     lines = [
         "## Facts",
-        f"Test: {scenario.description or scenario.fault.value}",
+        f"Fault code: {scenario.fault.value}",
         f"Verdict: {result.verdict.value}",
         f"Rule: {result.rule}",
         f"PayPal captures: {obs.captures}, total captured: {obs.amount_captured} {scenario.expect.currency}",

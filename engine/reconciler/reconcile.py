@@ -172,12 +172,11 @@ def _verdict_f2(
 
     if orders_created <= 1:
         verdict = Verdict.PASS
-        money_impact = "clean: idempotent order creation prevented duplicate PayPal orders"
+        money_impact = "clean: one PayPal order observed for this purchase"
     else:
         verdict = Verdict.FAIL
         money_impact = (
-            f"duplicate orders: {orders_created} orders created in PayPal for "
-            f"single purchase without idempotency key"
+            f"duplicate orders: {orders_created} PayPal orders observed for one purchase"
         )
 
     return verdict, rule, money_impact, app_captures
@@ -236,10 +235,13 @@ def _verdict_f4(
 
     if num_captures == expected_captures and app_captures == expected_captures:
         verdict = Verdict.PASS
-        money_impact = "clean: deterministic cart-hashed invoice ID reconciled cleanly"
+        money_impact = "clean: PayPal and the app recorded the expected capture"
     else:
         verdict = Verdict.FAIL
-        money_impact = "invoice collision: random invoice ID broke deterministic ledger reconciliation"
+        money_impact = (
+            "proxy-simulated invoice response failure: PayPal recorded "
+            f"{num_captures} capture(s), but the app recorded {app_captures}"
+        )
 
     return verdict, rule, money_impact, app_captures
 
