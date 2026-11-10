@@ -17,6 +17,12 @@ describe('compareOutcome', () => {
     expect(compareOutcome(red, after)).toBe('fixed')
     expect(compareOutcome(red, run('run_c', pass, 'run_a'))).toBe('not_comparable')
   })
+  it('never calls a prepared sample PASS a verified fix', () => {
+    const after = run('run_sample', pass, 'run_a')
+    after.mode = 'sample'
+    after.fix = { proposal: { applies: true } as FixProposal, patch_sha256: 'sha' }
+    expect(compareOutcome(red, after)).toBe('sample')
+  })
   it('says still failing when the repeat fails again', () => {
     const after = run('run_b', fail, 'run_a')
     after.fix = { proposal: { applies: true } as FixProposal, patch_sha256: 'sha' }

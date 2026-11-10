@@ -16,7 +16,8 @@ export function describeRun(run: Run): string {
   const { scenario, result } = run
   const lines = [
     `Run ${run.run_id} (short id ${shortId(run.run_id)})`,
-    `Fault injected: ${faultLabel(scenario.fault)}${scenario.description ? ` - ${scenario.description}` : ''}`,
+    run.mode === 'sample' ? 'Source: prepared sample fixture. No PayPal transaction or patch verification ran for this record.' : 'Source: live engine run.',
+    `${run.mode === 'sample' ? 'Fault illustrated' : 'Fault injected'}: ${faultLabel(scenario.fault)}${scenario.description ? ` - ${scenario.description}` : ''}`,
     `Where in the app: ${scenario.target_call.file}:${scenario.target_call.line}${scenario.target_call.method ? ` (${scenario.target_call.method})` : ''}`,
     `What was done to the call: ${scenario.inject.action} on ${scenario.inject.on}`,
     `What a correct app does: ${scenario.expect.captures_per_purchase} capture per purchase${scenario.expect.amount ? `, ${scenario.expect.amount} ${scenario.expect.currency}` : ''}`,
@@ -30,21 +31,21 @@ export function describeRun(run: Run): string {
   lines.push(
     `Verdict: ${result.verdict}`,
     `Rule checked: ${result.rule}`,
-    `PayPal's own records show ${observed.captures} capture(s), ${observed.amount_captured} captured`,
+    `${run.mode === 'sample' ? 'The sample PayPal state shows' : "PayPal's own records show"} ${observed.captures} capture(s), ${observed.amount_captured} captured`,
   )
   if (observed.app_recorded_captures != null) lines.push(`The app itself recorded ${observed.app_recorded_captures} capture(s)`)
   if (observed.refunds_issued != null) lines.push(`Refunds issued: ${observed.refunds_issued}`)
   lines.push(`Money impact: ${result.money_impact}`)
   if (result.error_message) lines.push(`Error: ${result.error_message}`)
-  if (evidence.paypal_order_ids.length) lines.push(`PayPal order IDs: ${evidence.paypal_order_ids.join(', ')}`)
-  if (evidence.paypal_capture_ids.length) lines.push(`PayPal capture IDs: ${evidence.paypal_capture_ids.join(', ')}`)
+  if (evidence.paypal_order_ids.length) lines.push(`${run.mode === 'sample' ? 'Sample order IDs' : 'PayPal order IDs'}: ${evidence.paypal_order_ids.join(', ')}`)
+  if (evidence.paypal_capture_ids.length) lines.push(`${run.mode === 'sample' ? 'Sample capture IDs' : 'PayPal capture IDs'}: ${evidence.paypal_capture_ids.join(', ')}`)
   return lines.join('\n')
 }
 
 export function listRuns(runs: Run[]): string {
   if (runs.length === 0) return 'There are no runs yet.'
   return runs
-    .map((r) => `${shortId(r.run_id)}  ${faultLabel(r.scenario.fault)}  ${r.status === 'complete' ? (r.result?.verdict ?? 'NO RESULT') : 'RUNNING'}  ${r.result?.money_impact ?? ''}`.trimEnd())
+    .map((r) => `${shortId(r.run_id)}  ${r.mode === 'sample' ? 'SAMPLE' : 'LIVE'}  ${faultLabel(r.scenario.fault)}  ${r.status === 'complete' ? (r.result?.verdict ?? 'NO RESULT') : 'RUNNING'}  ${r.result?.money_impact ?? ''}`.trimEnd())
     .join('\n')
 }
 
@@ -52,5 +53,6 @@ export const AGENT_ADDENDUM = [
   'You are also DriftGuard\'s run investigator. DriftGuard injects a fault into a payment flow and checks PayPal\'s own records afterwards.',
   'When asked why a run failed, what it means or what it cost, call explain_run (or list_runs to find the run) and answer ONLY from what the tool returns.',
   'Quote only numbers, amounts and IDs that appear in the tool output. If something is not in the output, say it is not in the record. Never guess a cause that the record does not show.',
+  'If a run says SAMPLE, describe it as a prepared fixture. Never call its IDs a new PayPal transaction or say its patch was applied or verified.',
   'Be short and plain: say what the buyer paid, what the app recorded, and what that means.',
 ].join(' ')

@@ -18,12 +18,12 @@ function origin(p: FixProposal): string {
   return p.source === 'llm' ? `Written by ${p.provider ?? 'the model'}, checked by code` : 'Curated fix selected by code'
 }
 
-export function FixPanel({ state, onRetry }: { state: FixState; onRetry: () => void }) {
+export function FixPanel({ state, onRetry, sample = false }: { state: FixState; onRetry: () => void; sample?: boolean }) {
   if (state.status === 'loading') {
     return (
       <div className="notice" role="status">
         <strong>Asking the Fixer…</strong>
-        <p className="muted small">A live model can take up to a minute. Nothing is changed in the shop.</p>
+        <p className="muted small">{sample ? 'Loading the curated sample patch. No shop code is changed.' : 'A live model can take up to a minute. Nothing is changed in the shop.'}</p>
       </div>
     )
   }
@@ -54,7 +54,7 @@ export function FixPanel({ state, onRetry }: { state: FixState; onRetry: () => v
     <div className="fix">
       <div className="fix-meta">
         <span className="chip chip-pass">
-          <span aria-hidden="true">✓</span>Checks passed
+          <span aria-hidden="true">✓</span>{sample ? 'Sample patch' : 'Checks passed'}
         </span>
         <span className="muted small">{origin(p)}</span>
       </div>
@@ -63,7 +63,7 @@ export function FixPanel({ state, onRetry }: { state: FixState; onRetry: () => v
         {p.files.join(', ')} · {p.lines_changed} lines changed
       </p>
       <DiffView diff={p.diff} />
-      <p className="muted small">Applies cleanly to a copy of the shop. It is not applied to the shop itself.</p>
+      <p className="muted small">{sample ? 'Prepared patch for illustration. It was not applied or tested by this hosted preview.' : 'Applies cleanly to a copy of the shop. It is not applied to the shop itself.'}</p>
     </div>
   )
 }

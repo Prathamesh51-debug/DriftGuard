@@ -78,6 +78,7 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
     ? runs.find((run) => run.run_id === compareAfterId)
     : compareBefore ? rerunOf(runs, compareBefore.run_id) : undefined
   const drawerOpen = selected !== null && view !== 'run'
+  const sampleMode = import.meta.env.VITE_DEMO_MODE === 'sample' || runs.some((run) => run.mode === 'sample')
 
   useEffect(() => {
     try {
@@ -155,11 +156,12 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
         sidebarCollapsed={sidebarCollapsed}
         theme={theme}
         view={view}
+        sampleMode={sampleMode}
       >
         {view === 'studio' ? (
           <StudioBoundary>
             <Suspense fallback={<p className="muted">Loading Studio…</p>}>
-              <StudioPanel runs={runs} />
+              <StudioPanel runs={runs} sampleMode={sampleMode} />
             </Suspense>
           </StudioBoundary>
         ) : view === 'overview' ? (

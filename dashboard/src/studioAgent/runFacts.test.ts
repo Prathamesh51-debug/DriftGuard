@@ -35,6 +35,13 @@ describe('describeRun', () => {
     const noApp = { ...failed, result: { ...fail, observed: { ...fail.observed, app_recorded_captures: null } } } as unknown as Run
     expect(describeRun(noApp)).not.toContain('The app itself recorded')
   })
+  it('makes sample provenance explicit to the Studio agent', () => {
+    const sample = { ...failed, mode: 'sample' } as Run
+    const text = describeRun(sample)
+    expect(text).toContain('prepared sample fixture')
+    expect(text).toContain('No PayPal transaction')
+    expect(listRuns([sample])).toContain('SAMPLE')
+  })
 })
 
 describe('listRuns', () => {

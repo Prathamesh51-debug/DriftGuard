@@ -19,6 +19,7 @@ interface LiveDashboardLayoutProps {
   sidebarCollapsed: boolean
   theme: LiveTheme
   view: LiveView
+  sampleMode: boolean
 }
 
 function SidebarIcon({ name }: { name: SidebarIconName }) {
@@ -49,6 +50,7 @@ export function LiveDashboardLayout({
   sidebarCollapsed,
   theme,
   view,
+  sampleMode,
 }: LiveDashboardLayoutProps) {
   const showBanners = offline || reconnected || actionError !== null
 
@@ -77,7 +79,7 @@ export function LiveDashboardLayout({
           title={offline ? 'The engine is unreachable' : undefined}
           onClick={onLaunch}
         >
-          {busy ? 'Working…' : 'Launch F1 run'}
+          {busy ? 'Working…' : sampleMode ? 'Show F1 sample' : 'Launch F1 run'}
         </button>
       </header>
 
@@ -136,7 +138,10 @@ export function LiveDashboardLayout({
           </a>
         </nav>
 
-        <main id="live-view-panel" className="main s02-main">{children}</main>
+        <main id="live-view-panel" className="main s02-main">
+          {sampleMode && <p className="s02-note" role="status">Interactive sample data. This hosted preview does not run PayPal payments or verify code patches.</p>}
+          {children}
+        </main>
       </div>
     </>
   )

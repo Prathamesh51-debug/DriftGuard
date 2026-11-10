@@ -55,7 +55,9 @@ function gapText(run: Run): string {
 }
 
 function HomeTerminal() {
-  const [visibleLines, setVisibleLines] = useState<TerminalLine[]>([])
+  const [visibleLines, setVisibleLines] = useState<TerminalLine[]>(() =>
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? HOME_TERMINAL_LINES : [],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -69,7 +71,6 @@ function HomeTerminal() {
     }
 
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      setVisibleLines(HOME_TERMINAL_LINES)
       return () => { cancelled = true }
     }
 
@@ -105,8 +106,7 @@ function HomeTerminal() {
       typeNextCharacters()
     }
 
-    setVisibleLines([])
-    showNextLine()
+    schedule(showNextLine, 0)
     return () => {
       cancelled = true
       timers.forEach((timer) => window.clearTimeout(timer))
@@ -284,6 +284,7 @@ export function HomePage() {
 
         <section className="home-band" id="latest-runs" aria-labelledby="latest-runs-title">
           <h2 id="latest-runs-title">Latest runs</h2>
+          {latestRuns.some((run) => run.mode === 'sample') && <p className="muted small">Sample scenario results; the hosted preview does not execute PayPal payments.</p>}
           <div className="home-runs-scroll">
             <table className="home-runs-table">
               <thead>

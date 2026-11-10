@@ -67,6 +67,8 @@ export interface Run {
   result: Result | null
   rerun_of: string | null
   fix?: { proposal: FixProposal; patch_sha256: string } | null
+  /** Present only on fixture-backed hosted preview runs. */
+  mode?: 'sample'
 }
 
 /** The AI service's answer to POST /fix (mirrors ai.fixer.FixProposal). */

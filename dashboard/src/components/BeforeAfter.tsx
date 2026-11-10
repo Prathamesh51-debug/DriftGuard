@@ -32,7 +32,7 @@ function Side({ title, run, tone }: { title: string; run: Run | undefined; tone:
           <p className="muted small mono">Run {shortId(run.run_id)}</p>
           <dl className="ba-numbers">
             <div>
-              <dt>Captures in PayPal</dt>
+              <dt>{run.mode === 'sample' ? 'Sample PayPal captures' : 'Captures in PayPal'}</dt>
               <dd className={`mono ${mismatch ? 'bad' : ''}`}>{result.observed.captures}</dd>
             </div>
             {result.observed.app_recorded_captures != null && (
@@ -57,6 +57,7 @@ function Side({ title, run, tone }: { title: string; run: Run | undefined; tone:
 
 const VERDICT_TEXT: Record<CompareOutcome, { cls: string; title: string; body: string }> = {
   waiting: { cls: '', title: 'Re-running…', body: 'The same chaos scenario is running again, and PayPal is being checked.' },
+  sample: { cls: '', title: 'Sample outcome', body: 'This PASS is a prepared fixture. No patch was run and no new PayPal payment was made.' },
   fixed: { cls: 'notice-pass', title: 'Fixed, and PayPal agrees', body: 'The same scenario that lost a payment now passes: PayPal and the app record the same capture.' },
   still_failing: { cls: 'notice-error', title: 'Still failing', body: 'The same scenario fails again, so this change did not fix the problem.' },
   error: { cls: 'notice-error', title: 'The re-run could not finish', body: 'No verdict was reached, so nothing is proven either way.' },
@@ -110,7 +111,7 @@ export function BeforeAfter({
         {proposal?.diff && (
           <section className="ba-diff">
             <h3>The fix</h3>
-            {after?.fix?.patch_sha256 && <p className="muted small mono">Patch SHA-256: {after.fix.patch_sha256}</p>}
+            {after?.fix?.patch_sha256 && <p className="muted small mono">{after.mode === 'sample' ? 'Sample patch' : 'Patch'} SHA-256: {after.fix.patch_sha256}</p>}
             {proposal.source === 'llm' && proposal.explanation && <p className="muted">{proposal.explanation}</p>}
             <DiffView diff={proposal.diff} />
           </section>

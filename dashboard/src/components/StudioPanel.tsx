@@ -1,7 +1,7 @@
 import { AgStudio, AgStudioProvider } from 'ag-studio-react'
 import { AgStudioAiModule, AgStudioModuleRegistry, studioTheme } from 'ag-studio'
 import type { AgStudioApi } from 'ag-studio'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AI_URL } from '../api'
 import type { Run } from '../types'
 import { RUN_FIELDS, toRunRows } from '../studioData'
@@ -29,16 +29,29 @@ const theme = studioTheme.withParams({
 const LICENCE_KEY: string | undefined = import.meta.env.VITE_AG_STUDIO_KEY
 const adapter = createAnthropicAdapter(AI_URL)
 
-export default function StudioPanel({ runs }: { runs: Run[] }) {
+export default function StudioPanel({ runs, sampleMode }: { runs: Run[]; sampleMode: boolean }) {
   const runsRef = useRef(runs)
+  const [modelStatus, setModelStatus] = useState<'checking' | 'configured' | 'preview' | 'offline'>('checking')
   useEffect(() => {
     runsRef.current = runs
   }, [runs])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch(`${AI_URL}/health`, { signal: controller.signal })
+      .then(async (response) => response.ok ? response.json() as Promise<{ model_ready?: boolean }> : Promise.reject())
+      .then((health) => setModelStatus(health.model_ready ? 'configured' : 'preview'))
+      .catch(() => { if (!controller.signal.aborted) setModelStatus('offline') })
+    return () => controller.abort()
+  }, [])
   const ai = useMemo(() => ({ api }: { api: AgStudioApi }) => buildHarness(api, adapter, () => runsRef.current), [])
   const data = useMemo(() => ({ sources: [{ id: 'runs', name: 'Runs', description: 'One row per DriftGuard chaos run.', data: toRunRows(runs), fields: RUN_FIELDS.map((f) => ({ ...f })) }] }), [runs])
 
   return (
     <div className="studio-wrap">
+      <p className="s02-note">
+        {sampleMode && 'Studio is exploring sample run data. '}
+        {modelStatus === 'configured' ? 'Claude is configured on the server.' : modelStatus === 'preview' ? 'AI preview answers are labeled; no Claude call is made.' : modelStatus === 'offline' ? 'The AI service is unreachable.' : 'Checking AI service…'}
+      </p>
       <AgStudioProvider licenseKey={LICENCE_KEY}>
         <AgStudio
           style={{ height: '100%' }}

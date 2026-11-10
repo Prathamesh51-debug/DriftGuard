@@ -198,11 +198,12 @@ export function EvidenceDrawer({
             {fix && (
               <>
                 <h3>Proposed fix</h3>
-                <FixPanel state={fix} onRetry={onPropose} />
+                <FixPanel state={fix} onRetry={onPropose} sample={run.mode === 'sample'} />
               </>
             )}
 
-            <h3>Evidence from PayPal sandbox</h3>
+            <h3>{run.mode === 'sample' ? 'Sample evidence fields' : 'Evidence from PayPal sandbox'}</h3>
+            {run.mode === 'sample' && <p className="muted small">Fixture IDs are examples; no new PayPal transaction ran here.</p>}
             <IdList title="Order IDs" ids={result.evidence.paypal_order_ids} />
             <IdList title="Capture IDs" ids={result.evidence.paypal_capture_ids} />
             <IdList title="Refund IDs" ids={result.evidence.paypal_refund_ids} />
@@ -242,7 +243,7 @@ export function EvidenceDrawer({
                 </button>
               )}
                 <button className={`btn ${compare ? '' : 'btn-primary'}`} disabled={busy} onClick={() => onRerun(run.run_id)}>
-                  {busy ? 'Starting…' : run.result?.verdict === 'FAIL' ? 'Generate and verify fix' : 'Re-run scenario'}
+                  {busy ? 'Starting…' : run.mode === 'sample' ? 'Show sample outcome' : run.result?.verdict === 'FAIL' ? 'Generate and verify fix' : 'Re-run scenario'}
               </button>
             </>
           )}

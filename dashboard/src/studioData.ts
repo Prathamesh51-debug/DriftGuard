@@ -4,6 +4,7 @@ import { faultLabel, shortId } from './format'
 /** One flat row per run: the shape AG Studio needs for its tables, charts and the agent's queries. */
 export interface RunRow {
   run_id: string
+  source: string
   fault: string
   verdict: string
   rule: string
@@ -26,6 +27,7 @@ export function toRunRows(runs: Run[]): RunRow[] {
     const app = r?.observed.app_recorded_captures ?? null
     return {
       run_id: shortId(run.run_id),
+      source: run.mode === 'sample' ? 'Sample fixture' : 'Live engine',
       fault: faultLabel(run.scenario.fault),
       verdict: r?.verdict ?? 'RUNNING',
       rule: r?.rule ?? '',
@@ -44,6 +46,7 @@ export function toRunRows(runs: Run[]): RunRow[] {
 /** Explicit fields so the dashboard and the agent get readable names and know what each column means. */
 export const RUN_FIELDS = [
   { id: 'run_id', name: 'Run', format: 'textFormat', description: "Short id of the chaos run." },
+  { id: 'source', name: 'Source', format: 'textFormat', description: "Sample fixture or live engine; sample data is not a new Sandbox transaction." },
   { id: 'fault', name: 'Fault', format: 'textFormat', description: "The injected failure, for example F1 Lost capture response." },
   { id: 'verdict', name: 'Verdict', format: 'textFormat', description: "PASS, FAIL, ERROR, or RUNNING. FAIL means PayPal's records broke a safety rule." },
   { id: 'rule', name: 'Rule', format: 'textFormat', description: "The safety rule the run was checked against." },

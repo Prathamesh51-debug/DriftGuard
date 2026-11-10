@@ -33,6 +33,7 @@ function gapText(run: Run): string {
 
 function runSummary(run: Run): string {
   const result = run.result
+  if (run.mode === 'sample') return `Sample: ${faultLabel(run.scenario.fault)} ${result?.verdict.toLowerCase() ?? 'running'}.`
   if (!result) return `${faultLabel(run.scenario.fault)} is still running.`
   if (result.verdict === 'ERROR') return 'This test could not complete.'
 
@@ -163,7 +164,7 @@ export function RunsPage(props: PageProps) {
     value(run).toLocaleLowerCase().includes((filters[key] ?? '').trim().toLocaleLowerCase()),
   ))
   const openRun = (runId: string) => {
-    window.location.href = `/live/runs/${encodeURIComponent(runId)}`
+    window.location.assign(`/live/runs/${encodeURIComponent(runId)}`)
   }
 
   return (
@@ -344,7 +345,7 @@ export function RunDetailPage({
             {copyState === 'copied' ? 'Copied' : 'Copy CLI command'}
           </button>
           <button className="btn btn-primary" type="button" disabled={busy} onClick={() => onRerun(run.run_id)}>
-              {busy ? 'Starting…' : failed ? 'Generate and verify fix' : 'Re-run scenario'}
+              {busy ? 'Starting…' : run.mode === 'sample' ? 'Show sample outcome' : failed ? 'Generate and verify fix' : 'Re-run scenario'}
           </button>
         </div>
       </div>
@@ -376,8 +377,8 @@ export function RunDetailPage({
               <ComparisonProof before={comparisonBefore} after={comparisonAfter} />
               <h2>What happened</h2>
               <ul className="s02-timeline">
-                <li><i aria-hidden="true" /><span>DriftGuard injected {scenario.inject.action} on {scenario.inject.on}.</span></li>
-                <li><i aria-hidden="true" /><span>PayPal recorded {captureText(run, false)}{result.observed.amount_captured == null ? '' : ` for ${result.observed.amount_captured} ${scenario.expect.currency}`}.</span></li>
+                <li><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample illustrates' : 'DriftGuard injected'} {scenario.inject.action} on {scenario.inject.on}.</span></li>
+                <li><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample PayPal state shows' : 'PayPal recorded'} {captureText(run, false)}{result.observed.amount_captured == null ? '' : ` for ${result.observed.amount_captured} ${scenario.expect.currency}`}.</span></li>
                 <li className={result.observed.app_recorded_captures === result.observed.captures ? 'is-good' : 'is-bad'}><i aria-hidden="true" /><span>The shop recorded {captureText(run, true)}.</span></li>
                 <li className={result.verdict === 'PASS' ? 'is-good' : 'is-bad'}><i aria-hidden="true" /><span>The <code>{result.rule}</code> check returned {result.verdict}.</span></li>
               </ul>
@@ -390,7 +391,8 @@ export function RunDetailPage({
         <div className="s02-detail-panel">
           {!result ? <p className="muted">Evidence is not available until this run completes.</p> : (
             <>
-              <h2>Evidence from PayPal Sandbox</h2>
+              <h2>{run.mode === 'sample' ? 'Sample evidence fields' : 'Evidence from PayPal Sandbox'}</h2>
+              {run.mode === 'sample' && <p className="muted small">These fixture IDs are examples, not a new PayPal transaction from this page.</p>}
               <EvidenceList title="Order IDs" values={result.evidence.paypal_order_ids} />
               <EvidenceList title="Capture IDs" values={result.evidence.paypal_capture_ids} />
               <EvidenceList title="Refund IDs" values={result.evidence.paypal_refund_ids} />
@@ -416,14 +418,14 @@ export function RunDetailPage({
         <div className="s02-detail-panel">
           {run.fix?.proposal ? (
             <>
-              <p className="s02-lead">This exact patch ran in a disposable shop copy. The reconciler returned <strong>{result?.verdict ?? 'no verdict yet'}</strong>.</p>
-              <p className="muted small mono">Patch SHA-256: {run.fix.patch_sha256}</p>
-              <FixPanel state={{ status: 'ready', proposal: run.fix.proposal }} onRetry={onPropose} />
+              <p className="s02-lead">{run.mode === 'sample' ? 'This is a prepared PASS fixture. The hosted preview did not apply the patch or make a new PayPal purchase.' : <>This exact patch ran in a disposable shop copy. The reconciler returned <strong>{result?.verdict ?? 'no verdict yet'}</strong>.</>}</p>
+              <p className="muted small mono">{run.mode === 'sample' ? 'Curated patch' : 'Patch'} SHA-256: {run.fix.patch_sha256}</p>
+              <FixPanel state={{ status: 'ready', proposal: run.fix.proposal }} onRetry={onPropose} sample={run.mode === 'sample'} />
             </>
           ) : !failed ? <p className="muted">A fix proposal is available for failed runs.</p> : (
             <>
               <p className="s02-lead">The Fixer proposes a patch. DriftGuard checks it before showing it.</p>
-              {fix ? <FixPanel state={fix} onRetry={onPropose} /> : <button className="btn btn-primary" type="button" onClick={onPropose}>Propose fix</button>}
+              {fix ? <FixPanel state={fix} onRetry={onPropose} sample={run.mode === 'sample'} /> : <button className="btn btn-primary" type="button" onClick={onPropose}>{run.mode === 'sample' ? 'View sample patch' : 'Propose fix'}</button>}
             </>
           )}
         </div>
@@ -443,7 +445,9 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const appCount = run.result.observed.app_recorded_captures
     return `PayPal ${run.result.observed.captures} capture${run.result.observed.captures === 1 ? '' : 's'}. Your app ${appCount == null ? 'has no reading' : `${appCount} capture${appCount === 1 ? '' : 's'}`}.`
   }
-  const toneClass = (run?: Run) => run?.result?.verdict === 'PASS' && run.fix?.patch_sha256
+  const toneClass = (run?: Run) => run?.mode === 'sample'
+    ? 'is-pending'
+    : run?.result?.verdict === 'PASS' && run.fix?.patch_sha256
     ? 'is-good'
     : run?.result?.verdict
       ? 'is-bad'
@@ -462,7 +466,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const setPosition = (value: number) => {
       splitRef.current = value
       proof.style.setProperty('--split', `${value}%`)
-      if (value < 40 && !seen && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) {
+      if (value < 40 && !seen && after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) {
         seen = true
         setPop(true)
         if (popTimer != null) window.clearTimeout(popTimer)
@@ -487,7 +491,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     }
     const demo = () => {
       if (cancelled || !autoRef.current) return
-      const endAt = after?.result?.verdict === 'PASS' && after?.fix?.patch_sha256 ? 20 : 80
+      const endAt = after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after?.fix?.patch_sha256 ? 20 : 80
       const stops = [splitRef.current, 92, 8, endAt]
       let leg = 0
       const next = () => {
@@ -516,13 +520,13 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
       if (popTimer != null) window.clearTimeout(popTimer)
       window.cancelAnimationFrame(frame)
     }
-  }, [after?.result?.verdict, after?.fix?.patch_sha256])
+  }, [after?.mode, after?.result?.verdict, after?.fix?.patch_sha256])
 
   const handleSplit = (value: number) => {
     autoRef.current = false
     splitRef.current = value
     proofRef.current?.style.setProperty('--split', `${value}%`)
-    if (value < 40 && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) setPop(true)
+    if (value < 40 && after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) setPop(true)
     else setPop(false)
   }
 
@@ -552,7 +556,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
           onChange={(event) => handleSplit(Number(event.target.value))}
         />
       </div>
-      <p className="s02-proof-caption">{after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : 'Generate and verify a fix to compare both runs.'}</p>
+      <p className="s02-proof-caption">{after?.mode === 'sample' ? 'Prepared PASS fixture shown for comparison. No patch was applied and no new PayPal order was made.' : after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : 'Generate and verify a fix to compare both runs.'}</p>
     </section>
   )
 }

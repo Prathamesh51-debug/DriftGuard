@@ -1,12 +1,13 @@
 import type { Run } from './types'
 
 /** What the before/after view concludes. Only "fixed" is green: the same chaos run must now PASS. */
-export type CompareOutcome = 'waiting' | 'fixed' | 'still_failing' | 'error' | 'not_comparable'
+export type CompareOutcome = 'waiting' | 'sample' | 'fixed' | 'still_failing' | 'error' | 'not_comparable'
 
 export function compareOutcome(before: Run, after: Run | undefined): CompareOutcome {
   if (before.result?.verdict !== 'FAIL') return 'not_comparable'
   if (!after?.result) return 'waiting'
   if (after.result.verdict === 'ERROR') return 'error'
+  if (before.mode === 'sample' || after.mode === 'sample') return 'sample'
   if (!after.fix?.patch_sha256 || !after.fix.proposal.applies) return 'not_comparable'
   switch (after.result.verdict) {
     case 'PASS':
