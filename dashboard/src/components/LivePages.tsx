@@ -487,7 +487,8 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     }
     const demo = () => {
       if (cancelled || !autoRef.current) return
-      const stops = [splitRef.current, 8, 92, 80]
+      const endAt = after?.result?.verdict === 'PASS' && after?.fix?.patch_sha256 ? 20 : 80
+      const stops = [splitRef.current, 92, 8, endAt]
       let leg = 0
       const next = () => {
         if (cancelled || !autoRef.current || leg >= stops.length - 1) return
