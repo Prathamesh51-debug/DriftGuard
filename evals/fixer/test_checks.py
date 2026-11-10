@@ -16,6 +16,7 @@ GOOD_DIFF_02 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-02.diff").read_text
 GOOD_DIFF_03 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-03.diff").read_text(encoding="utf-8")
 GOOD_DIFF_04 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-04.diff").read_text(encoding="utf-8")
 GOOD_DIFF_09 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-09.diff").read_text(encoding="utf-8")
+GOOD_DIFF_10 = (ROOT / "ai" / "fixer" / "known_fixes" / "BUG-10.diff").read_text(encoding="utf-8")
 ID_EXPRESSION = "createHash('sha256').update(`capture-${orderId}`).digest('hex')"
 
 SAFE_F2_SOURCE = """
@@ -253,3 +254,13 @@ def test_bug_09_accepts_a_persistent_set_deduplication_strategy():
         "    }",
     )
     assert check_patched("BUG-09", model_style) == []
+
+
+def test_bug_10_curated_fix_blocks_buyer_refunds_over_policy_limit(tmp_path):
+    patched = apply_to_copy(GOOD_DIFF_10, SHOP, tmp_path / "bug10") / "src" / "assistant.ts"
+    assert check_patched("BUG-10", patched.read_text(encoding="utf-8")) == []
+
+
+def test_bug_10_rejects_a_missing_refund_guard():
+    original = (SHOP / "src" / "assistant.ts").read_text(encoding="utf-8")
+    assert any("over-limit buyer role guard" in problem for problem in check_patched("BUG-10", original))

@@ -58,6 +58,8 @@ def test_f7_reports_a_failed_injection_as_error(monkeypatch):
     import requests
 
     class FailedResponse:
+        status_code = 503
+
         def raise_for_status(self):
             raise requests.HTTPError("shop returned 503")
 
@@ -66,3 +68,20 @@ def test_f7_reports_a_failed_injection_as_error(monkeypatch):
         _action_prompt_injection(scenario("f7"), {
             "shop_base": "http://127.0.0.1:3001", "order_id": "REAL-ORDER",
         })
+
+
+def test_f7_treats_an_explicit_policy_denial_as_a_completed_attack(monkeypatch, capsys):
+    class DeniedResponse:
+        status_code = 403
+
+        def json(self):
+            return {"refundTriggered": False, "error": "POLICY_LIMIT"}
+
+        def raise_for_status(self):
+            raise AssertionError("expected policy denial should not be treated as transport failure")
+
+    monkeypatch.setattr("requests.post", lambda *args, **kwargs: DeniedResponse())
+    _action_prompt_injection(scenario("f7"), {
+        "shop_base": "http://127.0.0.1:3001", "order_id": "REAL-ORDER",
+    })
+    assert "policy blocked" in capsys.readouterr().out

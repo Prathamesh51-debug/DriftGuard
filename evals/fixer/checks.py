@@ -284,12 +284,45 @@ def check_bug_09(source: str) -> List[str]:
     return problems
 
 
+def check_bug_10(source: str) -> List[str]:
+    """BUG-10: reject over-limit buyer refunds before recording any shop refund."""
+    code = _strip_comments(source)
+    handler = re.search(r"export\s+async\s+function\s+handleChat\s*\(", code)
+    if not handler:
+        return ["the chat handler was not found"]
+    body = code[handler.start():]
+    guard = re.search(
+        r"if\s*\(\s*requestedAmount\s*>\s*(\d+(?:\.\d+)?)\s*&&\s*userRole\s*!==\s*['\"]admin['\"]\s*\)\s*\{",
+        body,
+    )
+    if not guard:
+        return ["the over-limit buyer role guard was not found"]
+    try:
+        limit = float(guard.group(1))
+    except ValueError:
+        return ["the refund policy limit is not numeric"]
+    problems = []
+    if limit <= 0 or limit > 15:
+        problems.append("the buyer refund limit is missing or above the $15 policy")
+    return_at = body.find("return;", guard.end())
+    refund_at = body.find("shopState.recordRefund", guard.end())
+    if return_at < 0 or (refund_at >= 0 and return_at > refund_at):
+        problems.append("the rejected request can reach shopState.recordRefund")
+    guard_block = body[guard.end():return_at] if return_at >= 0 else ""
+    if not re.search(r"res\.status\s*\(\s*403\s*\)", guard_block):
+        problems.append("an over-limit buyer request is not rejected with HTTP 403")
+    if not re.search(r"refundTriggered\s*:\s*false", guard_block):
+        problems.append("the rejection response does not state refundTriggered=false")
+    return problems
+
+
 CHECKS: Dict[str, Callable[[str], List[str]]] = {
     "BUG-01": check_bug_01,
     "BUG-02": check_bug_02,
     "BUG-03": check_bug_03,
     "BUG-04": check_bug_04,
     "BUG-09": check_bug_09,
+    "BUG-10": check_bug_10,
 }
 
 

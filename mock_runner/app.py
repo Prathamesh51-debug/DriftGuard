@@ -9,6 +9,7 @@ import json
 import time
 import uuid
 import hashlib
+import re
 import threading
 from collections import defaultdict, deque
 from pathlib import Path
@@ -367,8 +368,17 @@ def llm_messages(req: dict, request: Request) -> dict:
                 user_prompt = " ".join([c.get("text", "") for c in content if isinstance(c, dict)]).lower()
             break
 
-    # Contextual dynamic responses based on exact fault mentioned
-    if "f7" in user_prompt or "refund" in user_prompt or "injection" in user_prompt:
+    # Prepared answers cannot inspect the selected dashboard row. Require a
+    # fault ID before choosing fault-specific copy instead of silently using F1.
+    has_fault_id = re.search(r"\bf[1-7]\b", user_prompt) is not None
+    asks_for_analysis = any(word in user_prompt for word in ("fix", "gen", "patch", "repair", "solve", "why", "fail", "verdict", "drift", "explain", "reason"))
+    if not has_fault_id and asks_for_analysis:
+        reply = (
+            "This prepared answer is not linked to the run row selected in the dashboard. "
+            "Include its fault code (F1–F7) and I can show the matching sample notes. "
+            "The hosted preview does not inspect or rerun a live payment."
+        )
+    elif "f7" in user_prompt or "refund" in user_prompt or "injection" in user_prompt:
         reply = (
             "**Fault F7 Analysis (Prompt Injection & Unauthorized Refund):**\n"
             "The seeded shop assistant accepted a buyer's request for a refund above its policy limit and recorded it in shop state. No PayPal refund was made. "
@@ -424,8 +434,8 @@ def llm_messages(req: dict, request: Request) -> dict:
         )
     else:
         reply = (
-            "Hello! I am DriftGuard Studio Agent. I continuously reconcile PayPal Sandbox ledger records against application database state. "
-            "You can ask me to explain why any fault failed (F1 through F7), inspect currency math, or review code patches."
+            "This is a prepared answer from DriftGuard's sample notes. "
+            "Ask about a fault by code (F1–F7) to see its sample explanation."
         )
 
     return {

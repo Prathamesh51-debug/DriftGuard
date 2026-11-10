@@ -71,6 +71,16 @@ def test_preview_answer_does_not_impersonate_claude(client, monkeypatch):
     assert answer["usage"] == {"input_tokens": 0, "output_tokens": 0}
 
 
+def test_generic_studio_prompt_does_not_assume_f1_or_selected_run(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    answer = client.post("/llm/messages", json={
+        "messages": [{"role": "user", "content": "For the latest failed run, explain a safe fix based on its evidence."}]
+    }).json()
+    text = answer["content"][0]["text"]
+    assert "not linked to the run row" in text
+    assert "Fault F1" not in text
+
+
 def test_paid_route_rejects_oversized_requests_without_a_model_call(client, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-only")
     monkeypatch.setenv("DRIFTGUARD_PUBLIC_AI_ENABLED", "1")

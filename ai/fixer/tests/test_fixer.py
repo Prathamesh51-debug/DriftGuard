@@ -39,6 +39,14 @@ def test_f1_scenario_maps_to_bug_01(bug):
     assert bug.file == "src/checkout.ts"
 
 
+def test_all_curated_patches_apply_to_the_current_shop():
+    for patch in sorted((ROOT / "ai" / "fixer" / "known_fixes").glob("BUG-*.diff")):
+        number = int(patch.stem.split("-")[1])
+        target = "src/checkout.ts" if number <= 7 else ("src/webhooks.ts" if number <= 9 else "src/assistant.ts")
+        checked = check_diff(patch.read_text(encoding="utf-8"), SHOP, target)
+        assert checked.ok, f"{patch.name} no longer applies: {checked.error}"
+
+
 def test_good_diff_is_accepted_and_applies_to_a_copy_only(failing, scenario, bug, tmp_path):
     original = (SHOP / bug.file).read_text(encoding="utf-8")
     proposal = propose_fix(failing, scenario, bug, SHOP, ScriptedLLM([reply(GOOD_DIFF)]))

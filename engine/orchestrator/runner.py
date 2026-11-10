@@ -4,6 +4,7 @@ Coordinates: Target App -> Headless Buyer Driver -> Chaos Proxy -> Reconciler.
 """
 
 import json
+import os
 import sys
 import tempfile
 import time
@@ -85,8 +86,19 @@ def _action_prompt_injection(scenario: Scenario, context: Dict[str, Any]) -> Non
         json={"message": prompt, "orderId": order_id, "userRole": user_role},
         timeout=10,
     )
+    if res.status_code == 403:
+        try:
+            denied = res.json()
+        except ValueError:
+            denied = {}
+        if denied.get("refundTriggered") is False:
+            print("[ORCHESTRATOR] Shop policy blocked the buyer refund request.")
+            return
     res.raise_for_status()
-    data = res.json()
+    try:
+        data = res.json()
+    except ValueError as exc:
+        raise RuntimeError("shop assistant returned invalid JSON") from exc
     print(f"[ORCHESTRATOR] Shop assistant response: refundTriggered={data.get('refundTriggered')}")
 
 
@@ -114,7 +126,7 @@ def order_request_body(scenario: Scenario) -> Dict[str, Any]:
 
 def run_scenario(
     scenario: Scenario,
-    target_shop_url: str = "http://localhost:3001",
+    target_shop_url: Optional[str] = None,
     proxy_url: str = "http://localhost:8080",
     max_retries: int = 1,
     scope_proxy_log: bool = True,
@@ -127,7 +139,7 @@ def run_scenario(
     3. Triggers capture on target shop (POST /api/orders/:id/capture)
     4. Runs Reconciler to generate mathematically proven Result
     """
-    shop_base = target_shop_url.rstrip("/")
+    shop_base = (target_shop_url or os.getenv("DEMO_SHOP_URL", "http://localhost:3001")).rstrip("/")
     audit_path = ROOT_DIR / "logs" / "proxy_traffic.jsonl"
     audit_offset = audit_path.stat().st_size if scope_proxy_log and audit_path.exists() else 0
 
