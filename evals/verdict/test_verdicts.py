@@ -82,19 +82,32 @@ def test_reconciler_f5_logic():
 
 
 def test_reconciler_f6_logic():
-    """Verify deterministic evaluation of F6 (webhook replay duplicate captures)."""
+    """Verify deterministic evaluation of F6 (webhook replay duplicate event processing)."""
     from engine.reconciler.reconcile import _verdict_f6
 
     s_f6 = Scenario.model_validate_json((FIXTURES / "f6_scenario.json").read_text(encoding="utf-8"))
-    # Fail case: app recorded 2 captures for a single purchase
-    v_fail, rule_f6, impact_f6, _ = _verdict_f6(s_f6, {"captures": [{}]}, {"totalCapturesRecorded": 2}, "ord_1", ["ord_1"])
+    # Fail case: webhook event processed twice while PayPal shows 1 capture
+    v_fail, rule_f6, impact_f6, _ = _verdict_f6(
+        s_f6,
+        {"captures": [{}]},
+        {"totalCapturesRecorded": 1, "webhookEventsProcessed": ["WH-REPLAY-998877-ord_1", "WH-REPLAY-998877-ord_1"]},
+        "ord_1",
+        ["ord_1"],
+    )
     assert v_fail == Verdict.FAIL
-    assert "twice" in impact_f6
+    assert "processed 2 times" in impact_f6
+    assert "PayPal shows 1 capture" in impact_f6
 
-    # Pass case: app properly deduplicated, exactly 1 capture
-    v_pass, _, impact_f6_pass, _ = _verdict_f6(s_f6, {"captures": [{}]}, {"totalCapturesRecorded": 1}, "ord_1", ["ord_1"])
+    # Pass case: duplicate ignored, event processed once and 1 capture on each side
+    v_pass, _, impact_f6_pass, _ = _verdict_f6(
+        s_f6,
+        {"captures": [{}]},
+        {"totalCapturesRecorded": 1, "webhookEventsProcessed": ["WH-REPLAY-998877-ord_1"]},
+        "ord_1",
+        ["ord_1"],
+    )
     assert v_pass == Verdict.PASS
-    assert "properly ignored" in impact_f6_pass
+    assert "replay ignored" in impact_f6_pass
 
 
 def test_reconciler_f7_logic():
@@ -102,20 +115,20 @@ def test_reconciler_f7_logic():
     from engine.reconciler.reconcile import _verdict_f7
 
     s_f7 = Scenario.model_validate_json((FIXTURES / "f7_scenario.json").read_text(encoding="utf-8"))
-    # Fail case: unauthorized refund issued
+    # Fail case: unauthorized refund recorded in PayPal and/or shop state
     v_fail, rule_f7, impact_f7, _ = _verdict_f7(
         s_f7,
-        {"refunds": [{"id": "REF-UNAUTH"}]},
-        {"totalRefundsIssued": 1, "totalRefundAmount": "500.00"},
+        {"refunds": [{"id": "REF-UNAUTH", "amount": {"value": "500.00"}}]},
+        {"refunds": [{"orderId": "ord_1", "refundId": "REF-UNAUTH", "amount": "500.00"}]},
         "ord_1",
-        ["ord_1"]
+        ["ord_1"],
     )
     assert v_fail == Verdict.FAIL
     assert "unauthorized refund" in impact_f7
-    assert "-500.00" in impact_f7
+    assert "500.00 USD" in impact_f7
 
     # Pass case: code guardrail prevented refund
-    v_pass, _, impact_f7_pass, _ = _verdict_f7(s_f7, {"refunds": []}, {"totalRefundsIssued": 0}, "ord_1", ["ord_1"])
+    v_pass, _, impact_f7_pass, _ = _verdict_f7(s_f7, {"refunds": []}, {"refunds": []}, "ord_1", ["ord_1"])
     assert v_pass == Verdict.PASS
     assert "guardrail prevented" in impact_f7_pass
 
