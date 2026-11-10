@@ -10,10 +10,12 @@ import json
 import time
 import uuid
 import hashlib
+import threading
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -120,6 +122,7 @@ class Run(BaseModel):
     result: Optional[Result] = None
     rerun_of: Optional[str] = None
     fix: Optional[FixProof] = None
+    mode: str = "sample"
 
 
 class _Stored(BaseModel):
@@ -143,13 +146,16 @@ allowed_origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()] 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins if "*" not in allowed_origins else ["*"],
-    allow_origin_regex=r"https://.*\.onrender\.com" if "*" not in allowed_origins else None,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 _runs: Dict[str, _Stored] = {}
+_ai_lock = threading.Lock()
+_ai_calls_total = 0
+_ai_calls_by_ip = defaultdict(deque)
+MAX_AI_CALLS_PER_PROCESS = 100
+MAX_AI_CALLS_PER_IP_HOUR = 30
 
 
 def _get_fix_proposal_for(scenario: Scenario) -> FixProposal:
@@ -162,11 +168,11 @@ def _get_fix_proposal_for(scenario: Scenario) -> FixProposal:
         bug_id=bug_id,
         applies=True,
         source="known_fix",
-        provider="Claude 3.7 Sonnet (Curated)",
+        provider=None,
         diff=diff_text,
         explanation=expl,
         files=files,
-        lines_changed=len(diff_text.splitlines()) if diff_text else 28,
+        lines_changed=len(diff_text.splitlines()),
         attempts=1,
     )
 
@@ -217,7 +223,7 @@ for idx, key in enumerate(["f7", "f6", "f5", "f4", "f3", "f2", "f1"]):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "mock": True, "faults_loaded": len(SCENARIOS)}
+    return {"status": "ok", "mock": True, "faults_loaded": len(SCENARIOS), "model_ready": bool(os.getenv("ANTHROPIC_API_KEY") and os.getenv("DRIFTGUARD_PUBLIC_AI_ENABLED") == "1")}
 
 
 @app.get("/runs", response_model=List[Run])
@@ -262,7 +268,7 @@ def rerun(run_id: str) -> Run:
 
 @app.post("/runs/{run_id}/verify-fix", response_model=Run, status_code=201)
 def verify_fix(run_id: str) -> Run:
-    """Simulates verifying the patch in an ephemeral environment, turning red into green with cryptographic proof and fresh order IDs."""
+    """Show the prepared PASS fixture beside a FAIL fixture; no patch or PayPal call runs here."""
     if run_id not in _runs:
         raise HTTPException(status_code=404, detail=f"run {run_id} not found")
     orig = _runs[run_id]
@@ -287,39 +293,49 @@ def verify_fix(run_id: str) -> Run:
     if pass_res is None:
         pass_res = list(RESULTS_PASS.values())[0]
 
-    # Generate fresh verified order and capture IDs so evidence differs from the failing run
-    fresh_order_id = f"ORD-VERIFIED-{uuid.uuid4().hex[:8].upper()}"
-    fresh_cap_id = f"CAP-VERIFIED-{uuid.uuid4().hex[:8].upper()}"
-    pass_data = pass_res.model_dump()
-    if "evidence" in pass_data and isinstance(pass_data["evidence"], dict):
-        if pass_data["evidence"].get("paypal_order_ids"):
-            pass_data["evidence"]["paypal_order_ids"] = [fresh_order_id]
-        if pass_data["evidence"].get("paypal_capture_ids"):
-            pass_data["evidence"]["paypal_capture_ids"] = [fresh_cap_id]
-    verified_result = Result.model_validate(pass_data)
-
-    return _view(_store(verified_result, scenario=orig.scenario, rerun_of=run_id, fix=proof))
+    return _view(_store(pass_res, scenario=orig.scenario, rerun_of=run_id, fix=proof))
 
 
 @app.post("/fix", response_model=FixProposal)
 def propose_fix_endpoint(req: FixRequest) -> FixProposal:
-    """Returns the verified curated patch for the failing run."""
+    """Returns a prepared curated patch; the hosted preview does not apply it."""
     return _get_fix_proposal_for(req.scenario)
 
 
 @app.post("/llm/messages")
-def llm_messages(req: dict) -> dict:
-    """Studio AI Assistant conversational responses for AG Grid panel."""
-    # Check if live Anthropic API key is provided
+def llm_messages(req: dict, request: Request) -> dict:
+    """A bounded model call when enabled; otherwise a clearly identified preview reply."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    if api_key:
+    if api_key and os.getenv("DRIFTGUARD_PUBLIC_AI_ENABLED") == "1":
+        messages = req.get("messages")
+        tools = req.get("tools", [])
+        if not isinstance(messages, list) or not messages or len(messages) > 24:
+            raise HTTPException(413, "Studio requires 1–24 messages")
+        if not isinstance(tools, list) or len(tools) > 20 or len(json.dumps(req)) > 40_000:
+            raise HTTPException(413, "Studio request is too large")
+        client_ip = request.client.host if request.client else "unknown"
+        global _ai_calls_total
+        with _ai_lock:
+            recent = _ai_calls_by_ip[client_ip]
+            while recent and recent[0] < time.monotonic() - 3600:
+                recent.popleft()
+            if _ai_calls_total >= MAX_AI_CALLS_PER_PROCESS or len(recent) >= MAX_AI_CALLS_PER_IP_HOUR:
+                raise HTTPException(429, "Studio model call limit reached")
+            _ai_calls_total += 1
+            recent.append(time.monotonic())
         try:
             import httpx
-            payload = dict(req)
-            if "model" not in payload:
-                payload["model"] = "claude-3-7-sonnet-20250219"
-            if "max_tokens" not in payload:
-                payload["max_tokens"] = 1024
+            payload = {
+                "model": os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5"),
+                "max_tokens": min(max(int(req.get("max_tokens", 1024)), 1), 2048),
+                "messages": messages,
+            }
+            if isinstance(req.get("system"), str):
+                payload["system"] = req["system"]
+            if tools:
+                payload["tools"] = tools
+                if isinstance(req.get("tool_choice"), dict):
+                    payload["tool_choice"] = req["tool_choice"]
             with httpx.Client(timeout=25.0) as client:
                 resp = client.post(
                     "https://api.anthropic.com/v1/messages",
@@ -332,8 +348,13 @@ def llm_messages(req: dict) -> dict:
                 )
                 if resp.status_code == 200:
                     return resp.json()
-        except Exception:
-            pass
+                raise HTTPException(502, f"Anthropic returned HTTP {resp.status_code}")
+        except HTTPException:
+            raise
+        except (ValueError, TypeError):
+            raise HTTPException(422, "Invalid Studio token limit") from None
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, f"Anthropic request failed: {type(exc).__name__}") from exc
 
     # Extract user prompt
     messages = req.get("messages", [])
@@ -352,19 +373,19 @@ def llm_messages(req: dict) -> dict:
         reply = (
             "**Fault F7 Analysis (Prompt Injection & Unauthorized Refund):**\n"
             "The AI customer support assistant executed an unauthenticated refund tool call without cryptographic authorization or role verification. "
-            "The fix (BUG-10 in `src/assistant.ts`) enforces a deterministic policy limit ($15.00 max) and requires an admin role before issuing refunds."
+            "The proposed BUG-10 patch in `src/assistant.ts` adds a deterministic policy limit ($15.00 max) and admin role check. This scenario uses a simulated shop-state refund."
         )
     elif "f6" in user_prompt or "webhook" in user_prompt or "replay" in user_prompt:
         reply = (
             "**Fault F6 Analysis (Webhook Replay Duplicate):**\n"
             "A replayed PayPal webhook event (`PAYMENT.CAPTURE.COMPLETED`) was delivered multiple times. Because event deduplication was missing, the shop double-recorded captures. "
-            "The fix (BUG-09 in `src/webhooks.ts`) checks `shopState.hasWebhookEvent(event.id)` and returns HTTP 200 DUPLICATE_IGNORED."
+            "The BUG-09 patch in `src/webhooks.ts` checks `shopState.hasWebhookEvent(event.id)`. Capture-level deduplication still needs live verification."
         )
     elif "f5" in user_prompt or "tax" in user_prompt or "math" in user_prompt or "money" in user_prompt:
         reply = (
             "**Fault F5 Analysis (Money Math Trap):**\n"
             "Floating-point tax rounding caused a 4-cent discrepancy ($38.92 observed vs $38.96 expected). "
-            "The fix (BUG-05 in `src/checkout.ts`) enforces strict integer minor-units or exact Decimal arithmetic."
+            "The proposed BUG-05 patch in `src/checkout.ts` uses integer minor units or exact Decimal arithmetic; the hosted preview has not rerun it."
         )
     elif "f4" in user_prompt or "invoice" in user_prompt:
         reply = (
@@ -409,9 +430,9 @@ def llm_messages(req: dict) -> dict:
         )
 
     return {
-        "id": f"msg_{uuid.uuid4().hex[:8]}",
-        "model": "claude-3-7-sonnet-20250219",
+        "id": f"preview_{uuid.uuid4().hex[:8]}",
+        "model": "driftguard-preview",
         "stop_reason": "end_turn",
-        "content": [{"type": "text", "text": reply}],
-        "usage": {"input_tokens": 120, "output_tokens": 85},
+        "content": [{"type": "text", "text": "Sample answer from prepared scenario notes; no Claude call was made.\n\n" + reply}],
+        "usage": {"input_tokens": 0, "output_tokens": 0},
     }

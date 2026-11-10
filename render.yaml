@@ -4,9 +4,10 @@
 # Architecture:
 # 1. Interactive Demo API Service:
 #    - FastAPI lightweight runner on Render free tier (uses <50MB RAM, 0 cloud spend)
-#    - Serves verified contract scenarios, live RED-to-GREEN reconciliation runs, and Studio responses
+#    - Serves sample contract scenarios and prepared RED/PASS outcomes; no Sandbox execution
 # 2. Command Center Dashboard:
 #    - React + Vite + AG Grid static site on Render global CDN (instant load, 0 cold start)
+# See docs/hosted-preview.md before adding an Anthropic API key.
 
 services:
   # ============================================================================
@@ -25,6 +26,12 @@ services:
         value: .
       - key: DRIFTGUARD_CORS_ORIGINS
         value: https://driftguard-dashboard.onrender.com,http://localhost:5173,http://localhost:3000
+      - key: DRIFTGUARD_PUBLIC_AI_ENABLED
+        value: "1"
+      - key: ANTHROPIC_MODEL
+        value: claude-haiku-5-5
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
   # ============================================================================
   # 2. Command Center Dashboard (Vite + React + AG Grid)
@@ -43,3 +50,5 @@ services:
         value: https://driftguard-api-8oan.onrender.com
       - key: VITE_AI_URL
         value: https://driftguard-api-8oan.onrender.com
+      - key: VITE_DEMO_MODE
+        value: sample
