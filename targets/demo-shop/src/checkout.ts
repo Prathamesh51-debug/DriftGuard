@@ -51,7 +51,7 @@ export function calculateOrderAmount(baseAmount: string, options?: OrderOptions)
     const subtotal = parseFloat(baseAmount);
     const naiveTax = subtotal * options.taxRate;
     // Buggy floating point calculation truncates cents and loses $0.04
-    const buggyTax = Math.floor((naiveTax - 0.04) * 100) / 100;
+    const buggyTax = Math.round((naiveTax - 0.04) * 100) / 100;
     finalAmount = (subtotal + buggyTax).toFixed(2);
   }
 

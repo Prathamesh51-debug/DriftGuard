@@ -30,14 +30,28 @@ RESULTS_PASS: Dict[str, Result] = {}
 DIFFS: Dict[str, str] = {}
 PATCH_HASHES: Dict[str, str] = {}
 
+# Accurate mapping to seeded bug catalog (targets/demo-shop/bugs.yaml)
 BUG_MAP = {
     "F1_LOST_CAPTURE_RESPONSE": "BUG-01",
     "F2_SLOW_PAYPAL": "BUG-02",
     "F3_FORCED_DECLINE": "BUG-03",
     "F4_DUPLICATE_INVOICE": "BUG-04",
     "F5_MONEY_MATH_TRAP": "BUG-05",
-    "F6_WEBHOOK_REPLAY": "BUG-06",
-    "F7_PROMPT_INJECTION": "BUG-07",
+    "F6_WEBHOOK_REPLAY": "BUG-09",
+    "F7_PROMPT_INJECTION": "BUG-10",
+}
+
+BUG_FILES = {
+    "BUG-01": ["src/checkout.ts"],
+    "BUG-02": ["src/checkout.ts"],
+    "BUG-03": ["src/checkout.ts"],
+    "BUG-04": ["src/checkout.ts"],
+    "BUG-05": ["src/checkout.ts"],
+    "BUG-06": ["src/checkout.ts"],
+    "BUG-07": ["src/checkout.ts"],
+    "BUG-08": ["src/webhooks.ts"],
+    "BUG-09": ["src/webhooks.ts"],
+    "BUG-10": ["src/assistant.ts"],
 }
 
 EXPLANATIONS = {
@@ -45,9 +59,12 @@ EXPLANATIONS = {
     "BUG-02": "Increase client timeout window and query order status before aborting slow upstream responses.",
     "BUG-03": "Handle 422 INSTRUMENT_DECLINED explicitly; prompt buyer for alternate payment rather than marking order completed.",
     "BUG-04": "Attach deterministic invoice ID and idempotency key to prevent accidental duplicate captures on connection retries.",
-    "BUG-05": "Strictly validate subtotal and line items match total amount before creating PayPal order to prevent money math tampering.",
-    "BUG-06": "Track processed capture IDs in shop state to discard duplicate webhook deliveries idempotently.",
-    "BUG-07": "Verify cryptographic refund authorization and enforce refund limits rather than blindly executing unauthenticated LLM tool calls.",
+    "BUG-05": "Strictly validate sales tax and line items using integer minor units or Decimal arithmetic to prevent floating-point rounding drift.",
+    "BUG-06": "Strictly validate coupon discount calculation across purchase unit amounts and item totals.",
+    "BUG-07": "Round zero-decimal currencies (JPY/KRW) to whole integers without fractional cents.",
+    "BUG-08": "Verify transmission signature with PayPal API before accepting incoming webhooks.",
+    "BUG-09": "Check shopState.hasWebhookEvent(event.id) before processing to discard duplicate webhook deliveries idempotently.",
+    "BUG-10": "Enforce deterministic policy guardrail on refunds (role check + max refund limit) rather than blindly executing chat assistant instructions.",
 }
 
 for i in range(1, 8):
@@ -63,7 +80,8 @@ for i in range(1, 8):
         RESULTS_FAIL[key] = rf
         RESULTS_PASS[key] = rp
 
-    bug_id = f"BUG-0{i}"
+for i in range(1, 11):
+    bug_id = f"BUG-{i:02d}"
     diff_path = KNOWN_FIXES / f"{bug_id}.diff"
     if diff_path.exists():
         diff_text = diff_path.read_text(encoding="utf-8")
@@ -139,6 +157,7 @@ def _get_fix_proposal_for(scenario: Scenario) -> FixProposal:
     bug_id = BUG_MAP.get(fault_str, "BUG-01")
     diff_text = DIFFS.get(bug_id, DIFFS.get("BUG-01", ""))
     expl = EXPLANATIONS.get(bug_id, "Add idempotency headers and state validation.")
+    files = BUG_FILES.get(bug_id, ["src/checkout.ts"])
     return FixProposal(
         bug_id=bug_id,
         applies=True,
@@ -146,7 +165,7 @@ def _get_fix_proposal_for(scenario: Scenario) -> FixProposal:
         provider="Claude 3.7 Sonnet (Curated)",
         diff=diff_text,
         explanation=expl,
-        files=["src/checkout.ts" if bug_id in ["BUG-01", "BUG-02", "BUG-03", "BUG-04"] else "src/state.ts"],
+        files=files,
         lines_changed=len(diff_text.splitlines()) if diff_text else 28,
         attempts=1,
     )
@@ -243,12 +262,15 @@ def rerun(run_id: str) -> Run:
 
 @app.post("/runs/{run_id}/verify-fix", response_model=Run, status_code=201)
 def verify_fix(run_id: str) -> Run:
-    """Simulates verifying the patch in an ephemeral environment, turning red into green with cryptographic proof."""
+    """Simulates verifying the patch in an ephemeral environment, turning red into green with cryptographic proof and fresh order IDs."""
     if run_id not in _runs:
         raise HTTPException(status_code=404, detail=f"run {run_id} not found")
     orig = _runs[run_id]
     proposal = _get_fix_proposal_for(orig.scenario)
-    patch_hash = PATCH_HASHES.get(proposal.bug_id, list(PATCH_HASHES.values())[0] if PATCH_HASHES else "431b7d67286f0f30adf7347e06133490e43ea0a070480108bc25d1adc3c7865d")
+    patch_hash = PATCH_HASHES.get(
+        proposal.bug_id,
+        list(PATCH_HASHES.values())[0] if PATCH_HASHES else "431b7d67286f0f30adf7347e06133490e43ea0a070480108bc25d1adc3c7865d"
+    )
     
     proof = FixProof(
         proposal=proposal,
@@ -265,7 +287,18 @@ def verify_fix(run_id: str) -> Run:
     if pass_res is None:
         pass_res = list(RESULTS_PASS.values())[0]
 
-    return _view(_store(pass_res, scenario=orig.scenario, rerun_of=run_id, fix=proof))
+    # Generate fresh verified order and capture IDs so evidence differs from the failing run
+    fresh_order_id = f"ORD-VERIFIED-{uuid.uuid4().hex[:8].upper()}"
+    fresh_cap_id = f"CAP-VERIFIED-{uuid.uuid4().hex[:8].upper()}"
+    pass_data = pass_res.model_dump()
+    if "evidence" in pass_data and isinstance(pass_data["evidence"], dict):
+        if pass_data["evidence"].get("paypal_order_ids"):
+            pass_data["evidence"]["paypal_order_ids"] = [fresh_order_id]
+        if pass_data["evidence"].get("paypal_capture_ids"):
+            pass_data["evidence"]["paypal_capture_ids"] = [fresh_cap_id]
+    verified_result = Result.model_validate(pass_data)
+
+    return _view(_store(verified_result, scenario=orig.scenario, rerun_of=run_id, fix=proof))
 
 
 @app.post("/fix", response_model=FixProposal)
@@ -282,6 +315,11 @@ def llm_messages(req: dict) -> dict:
     if api_key:
         try:
             import httpx
+            payload = dict(req)
+            if "model" not in payload:
+                payload["model"] = "claude-3-7-sonnet-20250219"
+            if "max_tokens" not in payload:
+                payload["max_tokens"] = 1024
             with httpx.Client(timeout=25.0) as client:
                 resp = client.post(
                     "https://api.anthropic.com/v1/messages",
@@ -290,7 +328,7 @@ def llm_messages(req: dict) -> dict:
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json",
                     },
-                    json=req,
+                    json=payload,
                 )
                 if resp.status_code == 200:
                     return resp.json()
@@ -309,40 +347,65 @@ def llm_messages(req: dict) -> dict:
                 user_prompt = " ".join([c.get("text", "") for c in content if isinstance(c, dict)]).lower()
             break
 
-    # Contextual dynamic responses
-    if any(w in user_prompt for w in ["fix", "gen", "patch", "repair", "solve"]):
+    # Contextual dynamic responses based on exact fault mentioned
+    if "f7" in user_prompt or "refund" in user_prompt or "injection" in user_prompt:
         reply = (
-            "To resolve ledger drift caused by network timeouts: \n\n"
-            "1. **Deterministic Idempotency**: Provide a unique `PayPal-Request-Id` (e.g. SHA-256 of `capture-${orderId}`) in every capture request.\n"
-            "2. **State Inquiry**: On 504 Gateway Timeout or network drops, query `ordersController.getOrder(orderId)` before retrying to verify if the capture settled upstream.\n"
-            "3. **Local Reconciliation**: Update application ledger only after confirming PayPal's COMPLETED status."
+            "**Fault F7 Analysis (Prompt Injection & Unauthorized Refund):**\n"
+            "The AI customer support assistant executed an unauthenticated refund tool call without cryptographic authorization or role verification. "
+            "The fix (BUG-10 in `src/assistant.ts`) enforces a deterministic policy limit ($15.00 max) and requires an admin role before issuing refunds."
+        )
+    elif "f6" in user_prompt or "webhook" in user_prompt or "replay" in user_prompt:
+        reply = (
+            "**Fault F6 Analysis (Webhook Replay Duplicate):**\n"
+            "A replayed PayPal webhook event (`PAYMENT.CAPTURE.COMPLETED`) was delivered multiple times. Because event deduplication was missing, the shop double-recorded captures. "
+            "The fix (BUG-09 in `src/webhooks.ts`) checks `shopState.hasWebhookEvent(event.id)` and returns HTTP 200 DUPLICATE_IGNORED."
+        )
+    elif "f5" in user_prompt or "tax" in user_prompt or "math" in user_prompt or "money" in user_prompt:
+        reply = (
+            "**Fault F5 Analysis (Money Math Trap):**\n"
+            "Floating-point tax rounding caused a 4-cent discrepancy ($38.92 observed vs $38.96 expected). "
+            "The fix (BUG-05 in `src/checkout.ts`) enforces strict integer minor-units or exact Decimal arithmetic."
+        )
+    elif "f4" in user_prompt or "invoice" in user_prompt:
+        reply = (
+            "**Fault F4 Analysis (Duplicate Invoice / Non-Deterministic Invoice ID):**\n"
+            "Invoice IDs generated using non-deterministic seeds caused invoice collision errors on retry. "
+            "The fix (BUG-04 in `src/checkout.ts`) derives deterministic invoice IDs from stable cart content hashes."
+        )
+    elif "f3" in user_prompt or "decline" in user_prompt:
+        reply = (
+            "**Fault F3 Analysis (Forced Decline / 422 INSTRUMENT_DECLINED):**\n"
+            "When PayPal returned 422 INSTRUMENT_DECLINED, the unpatched app mistakenly marked the order completed. "
+            "The fix (BUG-03 in `src/checkout.ts`) surfaces payment failure and keeps the order unpaid."
+        )
+    elif "f2" in user_prompt or "slow" in user_prompt:
+        reply = (
+            "**Fault F2 Analysis (Slow PayPal Upstream Latency):**\n"
+            "Upstream delays caused client timeout aborts without idempotent keys, creating unlinked duplicate orders on retry. "
+            "The fix (BUG-02 in `src/checkout.ts`) passes a stable PayPal-Request-Id across order creation retries."
+        )
+    elif any(w in user_prompt for w in ["fix", "gen", "patch", "repair", "solve"]):
+        reply = (
+            "**Recommended Fix (Fault F1 - Lost Capture Response):**\n"
+            "1. Attach a deterministic `PayPal-Request-Id` (SHA-256 of `capture-${orderId}`) to the capture request.\n"
+            "2. On 504 Gateway Timeout or network drops, query `ordersController.getOrder(orderId)` before retrying to check if the capture settled upstream.\n"
+            "3. Only update shop state when COMPLETED status is confirmed by PayPal."
         )
     elif any(w in user_prompt for w in ["why", "fail", "verdict", "drift", "explain", "reason"]):
         reply = (
-            "**Root Cause Analysis:**\n"
-            "The active fault simulates an asymmetric network boundary drop. PayPal successfully processed and recorded the payment ($38.97 USD), "
-            "but the response was dropped before reaching the application shop. The shop treated the HTTP timeout as a lost order, causing ledger drift: PayPal = 1 capture, App = 0 captures."
+            "**Root Cause Analysis (Fault F1):**\n"
+            "An asymmetric network boundary drop occurred after PayPal successfully captured the buyer's funds ($38.97 USD). "
+            "The application shop received a 504 Gateway Timeout and never credited the order in its database, causing ledger drift (PayPal = 1 capture, App = 0 captures)."
         )
     elif any(w in user_prompt for w in ["chart", "metric", "overview", "graph", "table", "report"]):
         reply = (
-            "The Studio report displays transaction telemetry across all 7 fault profiles (F1 to F7). "
-            "The chart highlights discrepancy rates between PayPal Sandbox ledger captures and application database settlements."
-        )
-    elif any(w in user_prompt for w in ["f2", "f3", "f4", "f5", "f6", "f7", "fault", "scenario"]):
-        reply = (
-            "DriftGuard monitors 7 core payment fault scenarios:\n"
-            "• **F1**: Lost capture response (504 timeout)\n"
-            "• **F2**: Slow PayPal upstream latency\n"
-            "• **F3**: 422 Instrument declined mishandling\n"
-            "• **F4**: Duplicate captures on retry timeout\n"
-            "• **F5**: Subtotal and currency manipulation\n"
-            "• **F6**: Webhook replay duplicate capture\n"
-            "• **F7**: Prompt injection unauthorized refund"
+            "The Studio canvas tracks transaction telemetry across all 7 fault profiles (F1 to F7). "
+            "Discrepancies between PayPal Sandbox ledger captures and application database records are flagged in red."
         )
     else:
         reply = (
-            "Hello! I am DriftGuard Studio Agent. I continuously analyze PayPal Sandbox ledger records against application state. "
-            "You can ask me to explain why a run failed, propose a code fix, break down currency discrepancies, or query any of the 7 chaos scenarios."
+            "Hello! I am DriftGuard Studio Agent. I continuously reconcile PayPal Sandbox ledger records against application database state. "
+            "You can ask me to explain why any fault failed (F1 through F7), inspect currency math, or review code patches."
         )
 
     return {
