@@ -16,6 +16,7 @@ import os
 import json
 import time
 import uuid
+import hashlib
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -37,21 +38,11 @@ DIFF_BUG_01 = ""
 if (KNOWN_FIXES / "BUG-01.diff").exists():
     DIFF_BUG_01 = (KNOWN_FIXES / "BUG-01.diff").read_text(encoding="utf-8")
 
-
-class Run(BaseModel):
-    run_id: str
-    status: str  # "running" | "complete"
-    created_at: float
-    scenario: Scenario
-    result: Optional[Result] = None
-    rerun_of: Optional[str] = None
-
-
-class _Stored(BaseModel):
-    run_id: str
-    created_at: float
-    result: Result
-    rerun_of: Optional[str] = None
+PATCH_SHA256 = (
+    hashlib.sha256(DIFF_BUG_01.encode("utf-8")).hexdigest()
+    if DIFF_BUG_01
+    else "431b7d67286f0f30adf7347e06133490e43ea0a070480108bc25d1adc3c7865d"
+)
 
 
 class FixRequest(BaseModel):
@@ -70,6 +61,29 @@ class FixProposal(BaseModel):
     lines_changed: int = 0
     attempts: int = 1
     error: Optional[str] = None
+
+
+class FixProof(BaseModel):
+    proposal: FixProposal
+    patch_sha256: str
+
+
+class Run(BaseModel):
+    run_id: str
+    status: str  # "running" | "complete"
+    created_at: float
+    scenario: Scenario
+    result: Optional[Result] = None
+    rerun_of: Optional[str] = None
+    fix: Optional[FixProof] = None
+
+
+class _Stored(BaseModel):
+    run_id: str
+    created_at: float
+    result: Result
+    rerun_of: Optional[str] = None
+    fix: Optional[FixProof] = None
 
 
 app = FastAPI(title="DriftGuard Interactive Demo API")
@@ -93,12 +107,32 @@ app.add_middleware(
 _runs: Dict[str, _Stored] = {}
 
 
-def _store(result: Result, rerun_of: Optional[str] = None, created_at: Optional[float] = None) -> _Stored:
+def _get_fix_proposal() -> FixProposal:
+    return FixProposal(
+        bug_id="BUG-01",
+        applies=True,
+        source="known_fix",
+        provider="Claude 3.7 Sonnet (Curated)",
+        diff=DIFF_BUG_01,
+        explanation="Add PayPal-Request-Id header to capture order call to ensure idempotent retry and prevent duplicate charges on 504 timeouts.",
+        files=["src/checkout.ts"],
+        lines_changed=len(DIFF_BUG_01.splitlines()) if DIFF_BUG_01 else 28,
+        attempts=1,
+    )
+
+
+def _store(
+    result: Result,
+    rerun_of: Optional[str] = None,
+    created_at: Optional[float] = None,
+    fix: Optional[FixProof] = None,
+) -> _Stored:
     run = _Stored(
         run_id=f"run_{uuid.uuid4().hex[:8]}",
         created_at=created_at if created_at is not None else time.time(),
         result=result,
         rerun_of=rerun_of,
+        fix=fix,
     )
     _runs[run.run_id] = run
     return run
@@ -113,6 +147,7 @@ def _view(stored: _Stored) -> Run:
         scenario=SCENARIO,
         result=stored.result if done else None,
         rerun_of=stored.rerun_of,
+        fix=stored.fix if done else None,
     )
 
 
@@ -157,23 +192,17 @@ def verify_fix(run_id: str) -> Run:
     """Simulates verifying the patch in an ephemeral environment, turning red into green."""
     if run_id not in _runs:
         raise HTTPException(status_code=404, detail=f"run {run_id} not found")
-    return _view(_store(RESULT_PASS, rerun_of=run_id))
+    proof = FixProof(
+        proposal=_get_fix_proposal(),
+        patch_sha256=PATCH_SHA256,
+    )
+    return _view(_store(RESULT_PASS, rerun_of=run_id, fix=proof))
 
 
 @app.post("/fix", response_model=FixProposal)
 def propose_fix_endpoint(req: FixRequest) -> FixProposal:
     """Returns the verified curated patch for the failing run."""
-    return FixProposal(
-        bug_id="BUG-01",
-        applies=True,
-        source="known_fix",
-        provider="Claude 3.7 Sonnet (Curated)",
-        diff=DIFF_BUG_01,
-        explanation="Add PayPal-Request-Id header to capture order call to ensure idempotent retry and prevent duplicate charges on 504 timeouts.",
-        files=["src/checkout.ts"],
-        lines_changed=len(DIFF_BUG_01.splitlines()) if DIFF_BUG_01 else 28,
-        attempts=1,
-    )
+    return _get_fix_proposal()
 
 
 @app.post("/llm/messages")
