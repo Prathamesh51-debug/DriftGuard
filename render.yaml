@@ -40,6 +40,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://driftguard-api.onrender.com
+        value: https://driftguard-api-8oan.onrender.com
       - key: VITE_AI_URL
-        value: https://driftguard-api.onrender.com
+        value: https://driftguard-api-8oan.onrender.com
