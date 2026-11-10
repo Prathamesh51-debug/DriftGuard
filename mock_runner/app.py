@@ -1,8 +1,7 @@
 """
 Interactive Mock Runner for DriftGuard:
 FastAPI lightweight demo server for Render deployment.
-Serves full interactive chaos test suite (F1 to F7),
-reconciliation runs, Before/After fix verification, and Studio AI Assistant.
+Serves F1–F7 sample fixtures, prepared Before/After outcomes, and Studio responses.
 """
 
 import os

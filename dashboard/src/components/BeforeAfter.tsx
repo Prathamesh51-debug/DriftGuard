@@ -56,7 +56,7 @@ function Side({ title, run, tone }: { title: string; run: Run | undefined; tone:
 }
 
 const VERDICT_TEXT: Record<CompareOutcome, { cls: string; title: string; body: string }> = {
-  waiting: { cls: '', title: 'Re-running…', body: 'The same chaos scenario is running again, and PayPal is being checked.' },
+  waiting: { cls: '', title: 'Re-running…', body: 'The repeat has not returned a result yet.' },
   sample: { cls: '', title: 'Sample outcome', body: 'This PASS is a prepared fixture. No patch was run and no new PayPal payment was made.' },
   fixed: { cls: 'notice-pass', title: 'Fixed, and PayPal agrees', body: 'The same scenario that lost a payment now passes: PayPal and the app record the same capture.' },
   still_failing: { cls: 'notice-error', title: 'Still failing', body: 'The same scenario fails again, so this change did not fix the problem.' },

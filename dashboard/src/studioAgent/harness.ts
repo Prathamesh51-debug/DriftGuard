@@ -11,7 +11,7 @@ import { AGENT_ADDENDUM, describeRun, findRun, listRuns } from './runFacts'
 export function buildHarness(api: AgStudioApi, adapter: AgLlmAdapter, getRuns: () => Run[]): AgAiHarness {
   const explainRun: AgAiTool = api.defineAiTool({
     name: 'explain_run',
-    description: 'Get the recorded facts for one DriftGuard run: what was injected, what PayPal recorded, what the app recorded, the verdict and the money impact. Use it to answer why a run failed.',
+    description: 'Get facts for one DriftGuard run, including whether it is a sample fixture or live engine result. Use it to answer why a run failed.',
     params: (s) => s.object({ run_id: s.string({ description: 'The run id, full or the short form shown in the table' }) }),
     execute: ({ run_id }, ctx) => {
       const run = findRun(getRuns(), run_id)

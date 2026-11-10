@@ -50,7 +50,7 @@ export const RUN_FIELDS = [
   { id: 'fault', name: 'Fault', format: 'textFormat', description: "The injected failure, for example F1 Lost capture response." },
   { id: 'verdict', name: 'Verdict', format: 'textFormat', description: "PASS, FAIL, ERROR, or RUNNING. FAIL means PayPal's records broke a safety rule." },
   { id: 'rule', name: 'Rule', format: 'textFormat', description: "The safety rule the run was checked against." },
-  { id: 'paypal_captures', name: 'Captures in PayPal', format: 'integerFormat', description: "How many captures PayPal's own records show." },
+  { id: 'paypal_captures', name: 'Captures in PayPal', format: 'integerFormat', description: "PayPal capture count in a live run, or the prepared PayPal count in a sample fixture. Check Source." },
   { id: 'app_recorded_captures', name: 'Captures in the app', format: 'integerFormat', description: "How many captures the shop app recorded itself." },
   { id: 'capture_drift', name: 'Capture drift', format: 'integerFormat', description: "PayPal captures minus app captures. Above zero means the buyer paid but the app lost the order." },
   { id: 'amount_captured', name: 'Amount captured', format: 'decimalFormat', description: "Total captured in PayPal, in the test currency." },

@@ -243,7 +243,9 @@ export function FaultsPage({ runs, loading, offline }: PageProps) {
           ? 'Loading run history. Fixture availability describes local contract data; it does not imply a live Sandbox run.'
           : offline && runs.length === 0
             ? 'The engine is unreachable. No run history is available; fixture availability does not imply a live Sandbox run.'
-            : 'Run counts and latest verdicts come from stored engine runs. Fixture availability describes local contract data and does not imply a live Sandbox run.'}
+            : runs.some((run) => run.mode === 'sample')
+              ? 'Run counts and verdicts here come from prepared sample fixtures. They do not imply new PayPal Sandbox execution.'
+              : 'Run counts and latest verdicts come from stored engine runs. Fixture availability describes local contract data and does not imply a live Sandbox run.'}
       </p>
       <div className="s02-table-wrap">
         <table className="s02-table s02-fault-table">
@@ -379,7 +381,7 @@ export function RunDetailPage({
               <ul className="s02-timeline">
                 <li><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample illustrates' : 'DriftGuard injected'} {scenario.inject.action} on {scenario.inject.on}.</span></li>
                 <li><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample PayPal state shows' : 'PayPal recorded'} {captureText(run, false)}{result.observed.amount_captured == null ? '' : ` for ${result.observed.amount_captured} ${scenario.expect.currency}`}.</span></li>
-                <li className={result.observed.app_recorded_captures === result.observed.captures ? 'is-good' : 'is-bad'}><i aria-hidden="true" /><span>The shop recorded {captureText(run, true)}.</span></li>
+                <li className={result.observed.app_recorded_captures === result.observed.captures ? 'is-good' : 'is-bad'}><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample app state shows' : 'The shop recorded'} {captureText(run, true)}.</span></li>
                 <li className={result.verdict === 'PASS' ? 'is-good' : 'is-bad'}><i aria-hidden="true" /><span>The <code>{result.rule}</code> check returned {result.verdict}.</span></li>
               </ul>
             </>
@@ -443,7 +445,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     if (!run.result) return 'PayPal is still checking this run.'
     if (run.result.verdict === 'ERROR') return 'The test could not finish.'
     const appCount = run.result.observed.app_recorded_captures
-    return `PayPal ${run.result.observed.captures} capture${run.result.observed.captures === 1 ? '' : 's'}. Your app ${appCount == null ? 'has no reading' : `${appCount} capture${appCount === 1 ? '' : 's'}`}.`
+    return `${run.mode === 'sample' ? 'Sample: PayPal' : 'PayPal'} ${run.result.observed.captures} capture${run.result.observed.captures === 1 ? '' : 's'}. ${run.mode === 'sample' ? 'App state' : 'Your app'} ${appCount == null ? 'has no reading' : `${appCount} capture${appCount === 1 ? '' : 's'}`}.`
   }
   const toneClass = (run?: Run) => run?.mode === 'sample'
     ? 'is-pending'
@@ -542,7 +544,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
         <div className={`s02-proof-side ${toneClass(after)}`}>
           <span>Repeat run</span>
           <strong>{after?.result?.verdict ?? (after ? 'RUNNING' : 'NOT RUN')}</strong>
-          <p>{after ? resultText(after) : 'Generate and verify a fix to compare results.'}</p>
+          <p>{after ? resultText(after) : before.mode === 'sample' ? 'Show the prepared PASS fixture to compare sample results.' : 'Generate and verify a fix to compare results.'}</p>
         </div>
         <div className="s02-proof-divider" aria-hidden="true" />
         <span className="s02-proof-knob" aria-hidden="true">↔</span>
@@ -556,7 +558,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
           onChange={(event) => handleSplit(Number(event.target.value))}
         />
       </div>
-      <p className="s02-proof-caption">{after?.mode === 'sample' ? 'Prepared PASS fixture shown for comparison. No patch was applied and no new PayPal order was made.' : after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : 'Generate and verify a fix to compare both runs.'}</p>
+      <p className="s02-proof-caption">{after?.mode === 'sample' ? 'Prepared PASS fixture shown for comparison. No patch was applied and no new PayPal order was made.' : after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : before.mode === 'sample' ? 'Show the sample outcome to compare both fixtures.' : 'Generate and verify a fix to compare both runs.'}</p>
     </section>
   )
 }
