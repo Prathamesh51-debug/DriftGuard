@@ -38,7 +38,7 @@ export interface OrderOptions {
 /**
  * Calculates final purchase amount applying tax and discounts.
  * SEEDED BUGS:
- * - BUG-05: Floating point math precision error on sales tax (rounds down by $0.04).
+ * - BUG-05: Seeded four-cent tax understatement.
  * - BUG-06: Coupon discount subtraction mismatch (item total does not equal sum of unit prices).
  * - BUG-07: Zero-decimal currency rounding error (fractional JPY/KRW).
  */
@@ -46,11 +46,11 @@ export function calculateOrderAmount(baseAmount: string, options?: OrderOptions)
   const currency = options?.currency || 'USD';
   let finalAmount = baseAmount;
 
-  // BUG-05: Floating point math precision error on sales tax
+  // BUG-05: Deliberately understates the computed tax by four cents.
   if (options?.taxRate !== undefined) {
     const subtotal = parseFloat(baseAmount);
     const naiveTax = subtotal * options.taxRate;
-    // Buggy floating point calculation truncates cents and loses $0.04
+    // Seeded bad adjustment: this is not a naturally occurring IEEE-754 rounding error.
     const buggyTax = Math.round((naiveTax - 0.04) * 100) / 100;
     finalAmount = (subtotal + buggyTax).toFixed(2);
   }

@@ -371,20 +371,20 @@ def llm_messages(req: dict, request: Request) -> dict:
     if "f7" in user_prompt or "refund" in user_prompt or "injection" in user_prompt:
         reply = (
             "**Fault F7 Analysis (Prompt Injection & Unauthorized Refund):**\n"
-            "The AI customer support assistant executed an unauthenticated refund tool call without cryptographic authorization or role verification. "
-            "The proposed BUG-10 patch in `src/assistant.ts` adds a deterministic policy limit ($15.00 max) and admin role check. This scenario uses a simulated shop-state refund."
+            "The seeded shop assistant accepted a buyer's request for a refund above its policy limit and recorded it in shop state. No PayPal refund was made. "
+            "The BUG-10 patch in `src/assistant.ts` adds a deterministic amount limit and admin role check. This is a prepared sample explanation."
         )
     elif "f6" in user_prompt or "webhook" in user_prompt or "replay" in user_prompt:
         reply = (
             "**Fault F6 Analysis (Webhook Replay Duplicate):**\n"
-            "A replayed PayPal webhook event (`PAYMENT.CAPTURE.COMPLETED`) was delivered multiple times. Because event deduplication was missing, the shop double-recorded captures. "
-            "The BUG-09 patch in `src/webhooks.ts` checks `shopState.hasWebhookEvent(event.id)`. Capture-level deduplication still needs live verification."
+            "The same capture-completed event was sent twice to the shop. Without event deduplication, the shop processed it twice even though PayPal held one capture. "
+            "The BUG-09 patch in `src/webhooks.ts` checks `shopState.hasWebhookEvent(event.id)`. This is a prepared sample explanation."
         )
     elif "f5" in user_prompt or "tax" in user_prompt or "math" in user_prompt or "money" in user_prompt:
         reply = (
             "**Fault F5 Analysis (Money Math Trap):**\n"
-            "Floating-point tax rounding caused a 4-cent discrepancy ($38.92 observed vs $38.96 expected). "
-            "The proposed BUG-05 patch in `src/checkout.ts` uses integer minor units or exact Decimal arithmetic; the hosted preview has not rerun it."
+            "The demo shop deliberately understated tax by four cents ($38.92 instead of $38.96). "
+            "The BUG-05 patch removes that adjustment; the hosted preview has not rerun it."
         )
     elif "f4" in user_prompt or "invoice" in user_prompt:
         reply = (

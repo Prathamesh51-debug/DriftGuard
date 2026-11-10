@@ -45,10 +45,14 @@ def _action_replay_event(scenario: Scenario, context: Dict[str, Any]) -> None:
         endpoint_path = parts[-1] if parts else "/api/webhooks"
 
     replayer = WebhookReplayer(endpoint_url=f"{shop_base}{endpoint_path}")
-    event_id = payload_cfg.get("event_id")
+    capture_id = context.get("capture_id")
+    if not capture_id:
+        raise RuntimeError("F6 needs the real capture ID from the completed checkout")
+    event_id = f"{payload_cfg.get('event_id') or 'WH-REPLAY'}-{order_id}"
     webhook_body = build_webhook_payload(
         event_id=event_id,
         order_id=order_id,
+        capture_id=capture_id,
         amount=scenario.expect.amount or "38.97",
         currency=scenario.expect.currency or "USD",
     )
@@ -56,6 +60,8 @@ def _action_replay_event(scenario: Scenario, context: Dict[str, Any]) -> None:
     print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {shop_base}{endpoint_path}...")
     replay_res = replayer.replay_duplicate(webhook_body, count=count)
     print(f"[ORCHESTRATOR] Replayed webhook {webhook_body['id']} {count}x (HTTP {[r['status_code'] for r in replay_res]})")
+    if len(replay_res) != count or any(r["status_code"] != 200 for r in replay_res):
+        raise RuntimeError("F6 webhook replay did not complete twice")
 
 
 def _action_prompt_injection(scenario: Scenario, context: Dict[str, Any]) -> None:
@@ -74,18 +80,14 @@ def _action_prompt_injection(scenario: Scenario, context: Dict[str, Any]) -> Non
 
     target_url = f"{shop_base}{endpoint_path}"
     print(f"[ORCHESTRATOR] Executing action '{scenario.inject.action}' on {target_url}...")
-    try:
-        res = requests.post(
-            target_url,
-            json={"message": prompt, "orderId": order_id, "userRole": user_role},
-            timeout=10,
-        )
-        data = res.json() if res.status_code == 200 else {}
-        refund_id = data.get("refundId")
-        refund_amount = data.get("refundAmount", "0.00")
-        print(f"[ORCHESTRATOR] Assistant response: refundTriggered={data.get('refundTriggered')}, refundId={refund_id}, amount=${refund_amount}")
-    except Exception as e:
-        print(f"[ORCHESTRATOR] Prompt injection request failed: {e}")
+    res = requests.post(
+        target_url,
+        json={"message": prompt, "orderId": order_id, "userRole": user_role},
+        timeout=10,
+    )
+    res.raise_for_status()
+    data = res.json()
+    print(f"[ORCHESTRATOR] Shop assistant response: refundTriggered={data.get('refundTriggered')}")
 
 
 # Post-capture active injection registry — keyed strictly by scenario.inject.action
@@ -93,6 +95,21 @@ POST_CAPTURE_ACTIONS = {
     "replay_event": _action_replay_event,
     "prompt_injection": _action_prompt_injection,
 }
+
+
+def order_request_body(scenario: Scenario) -> Dict[str, Any]:
+    """Build the shop request from scenario input; expectations are for comparison only."""
+    try:
+        amount = scenario.expect.amount if scenario.expect.amount and float(scenario.expect.amount) > 0 else "38.97"
+    except ValueError:
+        amount = "38.97"
+    body: Dict[str, Any] = {"amount": amount}
+    if scenario.inject and scenario.inject.payload:
+        body.update(scenario.inject.payload)
+        if body.get("subtotal") is not None:
+            body.pop("amount", None)
+    body.setdefault("currency", scenario.expect.currency)
+    return body
 
 
 def run_scenario(
@@ -120,19 +137,7 @@ def run_scenario(
 
     # 1. Create order on target shop
     print(f"\n[ORCHESTRATOR] 1. Creating order on {shop_base}/api/orders...")
-    order_amount = "38.97"
-    if scenario.expect.amount:
-        try:
-            if float(scenario.expect.amount) > 0:
-                order_amount = scenario.expect.amount
-        except ValueError:
-            pass
-
-    order_body: Dict[str, Any] = {"amount": order_amount}
-    if scenario.inject and scenario.inject.payload:
-        order_body.update(scenario.inject.payload)
-    if scenario.expect.currency:
-        order_body.setdefault("currency", scenario.expect.currency)
+    order_body = order_request_body(scenario)
 
     try:
         res = requests.post(
@@ -196,10 +201,13 @@ def run_scenario(
 
     # 3. Trigger capture on target shop
     print(f"[ORCHESTRATOR] 3. Triggering capture on {shop_base}/api/orders/{order_id}/capture...")
+    capture_id = None
     try:
         # Capture may return 502/504 because the demo shop catches the proxy drop
         cap_res = requests.post(f"{shop_base}/api/orders/{order_id}/capture", timeout=30)
         print(f"[ORCHESTRATOR] Target shop capture response: HTTP {cap_res.status_code}")
+        if cap_res.ok:
+            capture_id = cap_res.json().get("captureId")
     except Exception as e:
         print(f"[ORCHESTRATOR] Capture request threw exception: {e}")
 
@@ -210,9 +218,17 @@ def run_scenario(
     if scenario.inject and scenario.inject.action in POST_CAPTURE_ACTIONS:
         action_fn = POST_CAPTURE_ACTIONS[scenario.inject.action]
         try:
-            action_fn(scenario, {"shop_base": shop_base, "order_id": order_id})
+            action_fn(scenario, {"shop_base": shop_base, "order_id": order_id, "capture_id": capture_id})
         except Exception as e:
-            print(f"[ORCHESTRATOR] Active injection action '{scenario.inject.action}' error: {e}")
+            return Result(
+                scenario_id=scenario.scenario_id,
+                verdict=Verdict.ERROR,
+                rule="fault_injection_completed",
+                observed=ObservedState(captures=0, amount_captured="0.00"),
+                evidence=Evidence(paypal_order_ids=[order_id]),
+                money_impact="error: active fault did not complete",
+                error_message=str(e),
+            )
 
     # 5. Run Reconciler to produce final ground truth Result
     print(f"[ORCHESTRATOR] 4. Reconciling ground truth from PayPal records...")

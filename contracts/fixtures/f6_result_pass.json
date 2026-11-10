@@ -1,7 +1,7 @@
 {
   "scenario_id": "f6-webhook-replay-001",
   "verdict": "PASS",
-  "rule": "captures_per_purchase == 1",
+  "rule": "webhook_event_processed_once && app_recorded_captures == captures",
   "observed": {
     "captures": 1,
     "amount_captured": "38.97",
@@ -21,9 +21,9 @@
       "proxy-log-f6-pass-001"
     ],
     "webhook_event_ids": [
-      "WH-REPLAY-998877"
+      "WH-REPLAY-998877-ORDER-F6-001"
     ]
   },
-  "money_impact": "0.00 USD (idempotent webhook replay properly ignored)"
+  "money_impact": "replay ignored; PayPal and app each show one capture"
 }
 

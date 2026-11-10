@@ -3,13 +3,10 @@ Fault F6: Webhook Replay & Duplicate Processing.
 Planner Ref: Part 10 (Fault Matrix) — F6 / BUG-08, BUG-09.
 
 Mechanism:
-  - Intercepts webhook delivery or notification traffic.
-  - Monitors for duplicate event IDs (BUG-09) and unverified webhook signatures (BUG-08).
-  - Target application processes replayed PAYMENT.CAPTURE.COMPLETED multiple times.
-  - Reconciler checks expectation (captures_per_purchase == 1):
-    Since replayed duplicate webhook doubled the recorded capture (app_captures == 2),
-    Reconciler emits FAIL:
-    "buyer credited or charged twice via replayed webhook: +38.97 USD drift".
+  - The runner sends the same capture event twice directly to the demo shop.
+  - This proxy handler only logs webhook traffic when it is routed through the proxy.
+  - The reconciler checks that the shop processed it once. PayPal still has
+    one capture; a webhook replay does not charge the buyer again.
 """
 
 import json
@@ -34,7 +31,7 @@ def arm_request(flow: http.HTTPFlow):
             event_type = body.get("event_type", "UNKNOWN")
             ctx.log.warn(
                 f"[F6 ARMED] Webhook event intercepted: id={event_id}, type={event_type}. "
-                f"Monitoring for replay idempotency and double-credit."
+                f"Monitoring for duplicate event processing."
             )
         except Exception:
             ctx.log.warn("[F6 ARMED] Webhook request intercepted for F6 replay audit.")
@@ -47,7 +44,7 @@ def inject_response(flow: http.HTTPFlow) -> bool:
 
     status = flow.response.status_code if flow.response else 0
     ctx.log.error(
-        f"[F6 INJECTED] Webhook processed with HTTP {status}. Flagged for ledger reconciliation."
+        f"[F6 OBSERVED] Webhook response HTTP {status}. Flagged for ledger reconciliation."
     )
     return True
 

@@ -97,7 +97,7 @@ app.post('/api/orders/:id/capture', async (req: Request, res: Response) => {
 app.post('/api/webhooks', handleWebhook);
 
 /**
- * AI Customer Support Chat Endpoint
+ * Deterministic support chat endpoint
  * Evaluated by F7 prompt injection attacks (BUG-10 unauthorized refund bypass).
  */
 app.post('/api/chat', handleChat);

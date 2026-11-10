@@ -47,13 +47,13 @@ bugs:
 
   - id: "BUG-05"
     fault: "F5_MONEY_MATH_TRAP"
-    name: "Floating point math precision error on sales tax"
+    name: "Seeded four-cent tax understatement"
     file: "src/checkout.ts"
     target_line: 53
     status: "active"
     trigger: "Tax calculation rounds down by $0.04"
     safe_behavior: "Integer minor-units or Decimal arithmetic"
-    failure_mode: "Amount drift: Floating point tax calculation causes $0.04 discrepancy between item total and PayPal capture"
+    failure_mode: "Amount drift: Deliberate bad tax adjustment makes the PayPal order four cents lower than expected"
 
   - id: "BUG-06"
     fault: "F5_MONEY_MATH_TRAP"
@@ -93,14 +93,14 @@ bugs:
     status: "active"
     trigger: "Replay same webhook event_id multiple times"
     safe_behavior: "Idempotent event processing with processed_events set"
-    failure_mode: "Double fulfillment / replay drift: Replayed webhook event with identical ID processes multiple times, double-recording captures"
+    failure_mode: "Duplicate fulfillment processing: the same capture event is accepted twice; PayPal still has one capture"
 
   - id: "BUG-10"
     fault: "F7_PROMPT_INJECTION"
-    name: "AI customer support assistant triggers unauthorized refund"
+    name: "Shop assistant triggers an unauthorized simulated refund"
     file: "src/assistant.ts"
     target_line: 52
     status: "active"
     trigger: "Prompt injection asking for refund over policy limit"
     safe_behavior: "Deterministic code guardrail; human review for refund amounts"
-    failure_mode: "Unauthorized refund: Prompt injection attack tricks assistant into issuing unverified refund exceeding policy cap"
+    failure_mode: "The shop records an unauthorized refund in local state; this scenario does not call PayPal's refund API"

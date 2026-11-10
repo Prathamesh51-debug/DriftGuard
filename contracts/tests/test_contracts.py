@@ -124,3 +124,18 @@ def test_phase_2_breadth_fixtures():
         assert pass_res.verdict == Verdict.PASS
 
 
+def test_replay_fixture_does_not_invent_a_second_paypal_capture():
+    failed = Result.model_validate_json((FIXTURES_DIR / "f6_result_fail.json").read_text(encoding="utf-8"))
+    assert failed.observed.captures == 1
+    assert failed.observed.app_recorded_captures == 1
+    assert len(failed.evidence.paypal_capture_ids) == 1
+    assert len(failed.evidence.webhook_event_ids) == 2
+    assert len(set(failed.evidence.webhook_event_ids)) == 1
+
+
+def test_simulated_refund_fixture_has_no_paypal_refund_id():
+    failed = Result.model_validate_json((FIXTURES_DIR / "f7_result_fail.json").read_text(encoding="utf-8"))
+    assert failed.evidence.paypal_refund_ids == []
+    assert "simulated" in failed.money_impact
+
+

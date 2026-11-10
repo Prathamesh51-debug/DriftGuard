@@ -124,7 +124,9 @@ class StateStore {
       totalRefundsIssued: this.refunds.length,
       totalRefundAmount: totalRefunded,
       refunds: [...this.refunds],
-      webhookEventsProcessed: Array.from(this.processedWebhooks),
+      // Preserve deliveries, including duplicates, for the reconciler. The Set
+      // above is only for deciding whether a new delivery should be ignored.
+      webhookEventsProcessed: this.webhookEvents.map((event) => event.eventId),
       totalWebhooksProcessed: this.webhookEvents.length,
       currency: 'USD',
     };

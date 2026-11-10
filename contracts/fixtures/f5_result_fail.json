@@ -22,7 +22,7 @@
     ],
     "webhook_event_ids": []
   },
-  "money_impact": "money math drift: expected 38.96 USD, got 38.92 (-0.04 drift from floating-point tax rounding)",
+  "money_impact": "money math drift: expected 38.96 USD, got 38.92 (-0.04 drift from seeded tax calculation)",
   "error_message": null
 }
 

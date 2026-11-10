@@ -1,7 +1,7 @@
 {
   "scenario_id": "f2-order-timeout-001",
   "fault": "F2_SLOW_PAYPAL",
-  "description": "Inject 6000ms delay on POST /v2/checkout/orders to trigger client timeout and un-idempotent retry",
+  "description": "Delay the first create-order response by 1000ms, then substitute HTTP 504 to trigger an un-idempotent retry",
   "target_call": {
     "file": "src/checkout.ts",
     "line": 48,
@@ -10,7 +10,7 @@
   "inject": {
     "on": "POST .../v2/checkout/orders",
     "action": "delay",
-    "delay_ms": 6000
+    "delay_ms": 1000
   },
   "expect": {
     "captures_per_purchase": 1,

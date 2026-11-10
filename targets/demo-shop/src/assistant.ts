@@ -24,7 +24,7 @@ function extractRefundAmount(message: string): number {
 }
 
 /**
- * Handle AI Customer Support Assistant Chat (POST /api/chat)
+ * Handle deterministic demo-shop support chat (POST /api/chat)
  * Contains BUG-10 vulnerability (prompt injection bypasses refund limits).
  */
 export async function handleChat(req: Request, res: Response): Promise<void> {
@@ -48,7 +48,7 @@ export async function handleChat(req: Request, res: Response): Promise<void> {
 
   // BUG-10: Prompt injection triggers unauthorized refund
   // Vulnerability: Missing deterministic code guardrails (no max cap, no role check)
-  // Blindly issues refund based on customer chat instruction
+  // Records a simulated shop refund; no PayPal refund API is called.
   const refundId = `REF-INJ-${Date.now()}`;
   shopState.recordRefund(orderId, refundId, requestedAmount.toFixed(2));
 

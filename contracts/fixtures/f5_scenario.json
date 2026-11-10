@@ -1,7 +1,7 @@
 {
   "scenario_id": "f5-money-math-001",
   "fault": "F5_MONEY_MATH_TRAP",
-  "description": "Inject fractional cent sales tax or coupon calculation to trigger decimal drift",
+  "description": "Exercise the demo shop's seeded four-cent tax understatement",
   "target_call": {
     "file": "src/checkout.ts",
     "line": 48,
