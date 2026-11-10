@@ -1,75 +1,88 @@
 # DriftGuard
 
-**The autonomous chaos-testing and sandbox ledger-reconciliation harness for AI payment agents.**  
-Built for the PayPal AI Hackathon 2026.
+A payment can succeed even when the app never receives the success response. DriftGuard tests what a shop does next: does it retry, mark the order paid, or check what PayPal actually recorded?
 
-[![PayPal AI Hackathon](https://img.shields.io/badge/PayPal_AI_Hackathon-2026-003087?style=for-the-badge)](https://paypalaihackathon.devpost.com/)
-[![Built with APIMatic](https://img.shields.io/badge/APIMatic-Context_Plugin-10A37F?style=for-the-badge)](#)
-[![Powered by AG Grid Community](https://img.shields.io/badge/AG_Grid-Community-5B9DFF?style=for-the-badge)](#)
+The project runs deliberately broken checkouts against **PayPal Sandbox**. A proxy introduces a fault, the runner drives a buyer through checkout, and the reconciler compares PayPal's order with the demo shop's state. The dashboard shows the result. A fixer can apply a patch to a temporary copy of the shop and run a new Sandbox order to see whether the fault still fails.
 
-## The Problem
-Wiring language models to payment APIs introduces subtle, high-severity distributed systems bugs that mocked unit tests miss. When an AI agent drops an HTTP packet mid-capture, rounds a fractional tax calculation by $0.04, or receives a spoofed dispute webhook, it drifts from reality. The agent tells the user one thing, the local database records another, and the PayPal ledger reflects a third—often resulting in catastrophic double-charges or unauthorized refunds.
+Built by Team Pixentropy for the PayPal AI Hackathon.
 
-## What DriftGuard Does
-DriftGuard is a live runtime fuzzer and MITM fault-injector for `api-m.sandbox.paypal.com`. It intercepts live sandbox traffic from your AI application, injects real-world network and semantic faults, and mathematically proves whether your agent's deterministic guardrails hold. 
+## What has been proved
 
-```mermaid
-flowchart LR
-    A["1. SCAN<br/><b>Tree-sitter AST</b><br/>Maps SDK call sites & flags missing Request-Id"] --> B["2. ATTACK<br/><b>mitmproxy Kernel</b><br/>Injects 504 timeouts & dropped packets"]
-    B --> C["3. RECONCILE<br/><b>PayPal Ground Truth</b><br/>3-way diff: Buyer vs DB vs PayPal"]
-    C --> D["4. FIX<br/><b>APIMatic Context</b><br/>Generates deterministic .diff patch"]
+| Fault | Seeded failure | Saved patched rerun |
+|---|---|---|
+| F1 · lost capture response | PayPal captured; shop missed the record | PASS: one capture on both sides |
+| F2 · simulated gateway timeout | Retry produced two PayPal orders | PASS: one order, one capture |
+| F3 · declined instrument | Shop recorded a capture PayPal declined | PASS: neither side recorded a capture |
+| F4 · invoice response fault | Shop lost the capture record | PASS: one capture on both sides |
+
+These are **four local runs of curated patches against new Sandbox orders**, one patched rerun per fault. [The saved evaluation](evals/fixer/results/live-fixer-eval.md) has the parent and child run IDs, observations, patch hashes, and limits. It does not establish a general model success rate. F4 uses a simulated invoice response failure in the proxy; it does not reproduce PayPal's real duplicate-invoice error.
+
+F5–F7 have seeded shop behaviors and contract fixtures. They still need fresh live Sandbox red-to-green evidence. In F6, replaying a webhook can make the shop process an event twice; **it does not create a second PayPal capture**. F7 records a simulated refund in shop state; **it does not call PayPal's refund API**.
+
+## Try it
+
+You need Python, Node.js/npm, Docker Desktop, PayPal Sandbox REST credentials, and a Sandbox buyer account. The buyer driver also needs Playwright Chromium. Copy `.env.example` to `.env`, fill in the PayPal credentials and buyer login, and keep `.env` private.
+
+From the repository root:
+
+```powershell
+python -m pip install -r engine/requirements.txt
+python -m pip install -r ai/fixer/requirements.txt
+python -m playwright install chromium
+npm install --prefix targets/demo-shop
+npm install --prefix dashboard
+docker compose up -d
 ```
 
-### The Developer Workflow
-1. **Scan:** Parses your repository's AST (`ai.scanner`) to map PayPal SDK call sites (`Orders v2`, `Invoicing v2`, `Webhooks`) and detect missing idempotency headers, blind retry loops, or unverified signatures.
-2. **Attack:** A reverse proxy (`engine.proxy`) intercepts live Sandbox calls without code changes, injecting 504 Gateway Timeouts, duplicate invoices, and network drops mid-capture.
-3. **Reconcile:** Bypasses local application databases to query PayPal's Sandbox Ground Truth directly, calculating a 3-way reconciliation (Buyer UI vs App Database vs PayPal Ledger) displayed in an interactive AG Grid dashboard.
-4. **Fix:** Leverages APIMatic SDK specifications and AST rewriting (`ai.fixer`) to synthesize drop-in code patches (e.g. deterministic SHA-256 `PayPal-Request-Id` derived from stable cart & order fields), applies them to a disposable shop copy, and reruns the fault to turn the matrix from **RED** to **GREEN**.
+Start each of these in its own terminal:
 
-## Load-Bearing Tech Stack
-* **PayPal APIs:** `Orders v2`, `Invoicing v2`, `Captures Refund API`, `Transaction Search`, `verify-webhook-signature`.
-* **Execution Kernel:** `mitmproxy` (fault injection), PostgreSQL (`SKIP LOCKED` concurrent job queues), Docker.
-* **AI & AST:** Anthropic Claude (semantic evaluation), `tree-sitter` (code mapping), APIMatic Context Plugin (SDK patch generation).
-* **Frontend Dashboard:** React, AG Grid (live 3-way ledger reconciliation), AG Studio.
-
-## Measured Impact
-* **25-Repo Empirical Study:** **18 out of 25 (72%) public AI payment apps we tested possessed critical payment state drift vulnerabilities.** In our empirical study of 25 anonymized, open-source AI commerce repositories integrating PayPal (`study/methodology.md`), 13 omitted `PayPal-Request-Id` headers and 5 implemented blind retry loops on network timeouts. When subjected to DriftGuard's dynamic F1 (Lost Capture Response) chaos scenario in PayPal Sandbox, **5 of 7 tested applications actively double-charged buyers or permanently lost customer order records.**
-* **Local Red-to-Green Verification:** In a local demo-shop sample, **4 of 4 curated-patch reruns** (F1–F4) changed from a stored FAIL to a PASS on a new PayPal Sandbox order. This measures the deliberately seeded shop and one verified rerun per fault; it is not a reliability estimate for other applications or model-generated patches. See the [live fixer evaluation](evals/fixer/results/live-fixer-eval.md) for run IDs, PayPal evidence, and fault-specific limits.
-
-## Quick Start
-
-### Run the live demo locally
-
-Copy `.env.example` to `.env` and set PayPal Sandbox credentials and a Sandbox buyer. From the repository root, start these in separate terminals:
-
-```bash
-docker compose up -d
-python -m uvicorn engine.api.main:app --port 8000
-npm --prefix targets/demo-shop install
+```powershell
+python -m uvicorn engine.api.main:app --port 8000 --reload
+python -m uvicorn ai.service.app:app --port 8001 --reload
 npm --prefix targets/demo-shop run dev
-npm --prefix dashboard install
 npm --prefix dashboard run dev
 ```
 
-Open `http://localhost:5173/` for the landing page or `/live` for stored engine runs. The dashboard defaults to the engine at `http://localhost:8000`; set `VITE_API_URL` when it runs elsewhere. Ask Studio also needs the AI service on port 8001.
+Open `http://localhost:5173/` for the landing page and `http://localhost:5173/live` for stored runs. Run `python -m cli run F1` from another terminal, then open its result in the dashboard. `python -m cli report --all` lists stored runs. A FAIL returns exit code 1 because the test found the seeded bug; ERROR returns 2 because the run could not be completed.
 
-For the local red-to-green proof, set `DRIFTGUARD_ENABLE_FIX_RERUN=1` in `.env` before starting the engine. A failed run's **Generate and verify fix** action applies a server-generated diff to a disposable shop copy, builds it, makes a fresh Sandbox purchase through the proxy, and stores the patch hash and reconciled result in a child run. `DRIFTGUARD_LLM=none` uses the curated patch without a model call. Keep this setting off on public deployments: the patched Node process executes generated code and is not a security sandbox.
+The dashboard uses `http://localhost:8000` by default. Set `VITE_API_URL` in `dashboard/.env.local` if your API is elsewhere. Studio's model endpoint defaults to port 8001; without the AI service or a valid Anthropic key, model answers are unavailable. The run table and reconciler work without a model key.
 
-The CLI uses that same engine API. From the repository root, run `python -m cli run F1` to launch a fault and wait for its verdict, `python -m cli report --all` to list stored runs, or `python -m cli report RUN_ID` to inspect one. A detected FAIL exits with code 1 by design; PASS exits 0 and an incomplete/error run exits 2. Reports for verified child runs include the patch source and SHA-256.
+For a local patch-and-rerun demo, set `DRIFTGUARD_ENABLE_FIX_RERUN=1` and `DRIFTGUARD_LLM=none` in `.env` **before** starting the API. Use **Generate and verify fix** on a failed run. The engine applies its curated patch to a disposable shop copy, builds it, runs a new order, and stores a child result. This executes patched Node code, so use it only on a trusted local machine. It is disabled on the public preview.
 
-## Repository Structure
-* `/engine` - The MITM proxy, deterministic reconciler, and API orchestrator.
-* `/ai` - Tree-sitter AST scanner, scenario generator, and APIMatic fixer.
-* `/dashboard` - The AG Grid command center and visual ledger.
-* `/targets/demo-shop` - A deliberately vulnerable sandbox commerce app seeded with 10 exact bugs to test the harness.
-* `/contracts` - Shared Pydantic schemas validating the JSON pipeline between the AI and the execution engine.
+If port 8080 is already in use, stop the other service or change the proxy mapping and matching proxy configuration. If PostgreSQL is unavailable, the engine falls back to persistent SQLite and prints that choice at startup. A working database alone does not start the shop, proxy, or buyer browser.
 
-See [`docs/repo-ownership.md`](docs/repo-ownership.md) for who leads and reviews each folder, and [`docs/planner.md`](docs/planner.md) for the day-by-day execution plan.
+## Hosted preview
 
-## Contributors
+The Render blueprint serves the React dashboard and a **fixture-backed API**. It lets visitors inspect example F1–F7 runs and prepared before/after outcomes. Its launch and verify buttons do **not** drive Playwright, run mitmproxy, apply code, or make a new PayPal Sandbox payment. Sample responses carry `mode: "sample"` for the UI. To see a live checkout, use the local setup above and the [saved evidence](evals/fixer/results/live-fixer-eval.md).
 
-Team Pixentropy 
+Hosted Studio can optionally call Anthropic from the API service. Set `ANTHROPIC_API_KEY` only as a Render secret, after setting a spend cap in the Anthropic Console. Without the key it gives a labeled prepared answer. The in-process call limits reset when the service restarts; they are not a billing limit. Never put an API key in a `VITE_` variable.
 
-- [Swastik Bose](https://github.com/VasuBhakt)
-- [Kiran Patra](https://github.com/patrakiran)
-- [Prathamesh Prasad](https://github.com/Prathamesh51-debug)
+## How it fits together
+
+```text
+PayPal Sandbox ←→ mitmproxy ←→ seeded demo shop
+                              ↑          ↓
+                       buyer driver   shop state
+                              ↓          ↓
+                        runner → reconciler → stored run → dashboard
+                                      ↑
+                          fixer: temporary shop copy + new run
+```
+
+- `engine/`: API, run orchestration, proxy rules, and deterministic reconciliation.
+- `targets/demo-shop/`: the intentionally vulnerable TypeScript shop. `targets/known-fixes/` holds curated repair patches.
+- `ai/`: buyer automation, a pattern-based source scanner, scenario generation, explainer, and patch fixer. Model output proposes changes; the engine decides the verdict.
+- `contracts/`: schemas and example scenarios/results. Fixtures are examples, not evidence of a live payment.
+- `dashboard/`: React and AG Grid interface, with an AG Studio canvas.
+- `mock_runner/`: the fixture API used only for the hosted preview.
+- `evals/`: tests and saved evaluations. The [study folder](study/methodology.md) contains an exploratory annotation dataset, not a reproducible 25-repository Sandbox study.
+
+The current scanner uses source patterns, not Tree-sitter. The live path uses PayPal Orders create/capture and order evidence; F7 refunds and parts of F4/F6 are shop/proxy simulations. The proxy's active fault is shared, so run faults sequentially. These limits matter if you adapt the harness to another shop.
+
+## Team
+
+- [Swastik Bose](https://github.com/VasuBhakt) · engine and reconciliation
+- [Kiran Patra](https://github.com/patrakiran) · scenarios and demo shop
+- [Prathamesh Prasad](https://github.com/Prathamesh51-debug) · fixer, dashboard, and buyer driver
+
+See [repo ownership](docs/repo-ownership.md) for the folder map and [the original planner](docs/planner.md) for the hackathon plan. The planner records intended work; this README describes current behavior.

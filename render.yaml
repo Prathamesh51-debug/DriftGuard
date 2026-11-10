@@ -7,7 +7,7 @@
 #    - Serves sample contract scenarios and prepared RED/PASS outcomes; no Sandbox execution
 # 2. Command Center Dashboard:
 #    - React + Vite + AG Grid static site on Render global CDN (instant load, 0 cold start)
-# See docs/hosted-preview.md before adding an Anthropic API key.
+# See the Hosted preview section in README.md before adding an Anthropic API key.
 
 services:
   # ============================================================================

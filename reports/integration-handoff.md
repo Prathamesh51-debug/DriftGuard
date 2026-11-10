@@ -1,21 +1,27 @@
-# Integration handoff — 9 November 2026
+# Integration handoff · 10 November 2026
 
-## Role C proof completed locally
+## Saved live evidence
 
-- F1–F4: four stored failed runs, four child reruns after curated patches, and four reconciled PASS results on distinct PayPal Sandbox orders. Exact run IDs and patch hashes are in [`live-fixer-eval.md`](../evals/fixer/results/live-fixer-eval.md).
-- Direct Claude patch evidence exists for F2, F3, and F4. The product's four child reruns used curated fallback in offline mode; these are separate results.
-- The Explainer's fresh Claude evaluation checked four stored Sandbox failures. Four of four passed the bounded numeric/ID verifier after a manual claim audit; see [`evals/explainer/results/README.md`](../evals/explainer/results/README.md).
-- CLI, live dashboard routes, and projector-size layout were checked locally. See [`projector-qa.md`](projector-qa.md).
-- A final replay of saved Claude candidates exposed two limits: BUG-01 was rejected before a live rerun for missing PayPal status recovery after an ambiguous capture; BUG-09 was rejected for counting a capture already recorded by checkout. Historical source-check scores do not override these product gates; see [`live-fixer-eval.md`](../evals/fixer/results/live-fixer-eval.md).
+The local engine has stored F1–F4 failed parent runs and passing child runs on distinct PayPal Sandbox orders after curated patches. The [fixer evaluation](../evals/fixer/results/live-fixer-eval.md) gives exact run IDs, patch hashes, observations, and separate Claude candidate evidence. These runs were sequential. They do not measure reliability on other shops.
 
-## Integration gates still open
+The Explainer evaluated four saved Sandbox failures with Claude. Its [result note](../evals/explainer/results/README.md) records the bounded claim check. The [projector check](projector-qa.md) covers local Chromium layout only.
 
-| Gate | Owner in planner | Exact issue | Evidence needed to close |
-|---|---|---|---|
-| F5 money math | B shop/scenario; A runner/reconciler | The F5 scenario has `subtotal=35.99`, `tax_rate=0.0825`, `expect.amount=38.96`, but the runner sends both `amount=38.96` and `subtotal=35.99`. The shop selects `amount` first, then applies tax, so it tests the wrong base. Even if the runner selects the subtotal, the seeded `Math.floor((naiveTax - 0.04) * 100) / 100` yields 38.91, whereas the FAIL fixture says 38.92. | Align the scenario, runner and seeded calculation, then capture an original FAIL and patched PASS from distinct live Sandbox orders. |
-| F6 / BUG-09 replay | B shop/replayer; A reconciler | The replay uses a synthetic capture ID. The shop records a successful capture during checkout, then the first webhook records it again; a simple event-ID dedup patch still leaves the app count at two. The current BUG-09 behavior check rejects that patch. | Make the webhook refer to the actual PayPal capture and deduplicate both event and capture effects. Then verify original FAIL and patched PASS against per-order PayPal evidence. |
-| F4 invoice semantics | A proxy; B shop | The active proxy returns a synthetic `DUPLICATE_INVOICE_ID`-style response on capture when it sees a random numeric invoice. This proves an app-facing response failure and recovery, but does not prove an actual PayPal duplicate-invoice rejection. | Either retain the honest simulation label or create a real duplicate-invoice case and record PayPal's own error and the app's behavior. |
-| F2 timing claim | A proxy; B scenario | The scenario fixture describes a 6000 ms delay, while the active proxy waits about 1000 ms before substituting 504. | Align timing or keep demo and explanation limited to the observed 1000 ms mechanism. |
-| Hosted demo | A deployment | `infra/render.yaml` is a blueprint. The local proof has not established a working hosted API, proxy, shop, or Studio AI service. The local patch executor runs generated Node code and defaults off for public deployment. | Deploy an isolated environment, verify real run and Studio routes at the public URL, and design a secure executor before enabling public patch reruns. |
+## Remaining integration gates
 
-No F5 live verdict, real PayPal F4 duplicate-invoice rejection, or hosted demonstration is claimed here.
+| Gate | Current state | Evidence needed |
+|---|---|---|
+| F5 amount | Runner now sends the `35.99` subtotal and tax rate, not the expected `38.96` as the checkout input. BUG-05 patch context matches the current seeded rounding code. Unit tests and shop build pass. | Fresh failed and patched Sandbox orders with exact PayPal totals and patch hash. |
+| F6 replay | Runner uses the capture ID from the checkout and a unique event ID per order. Shop state now exposes repeated event deliveries rather than collapsing them to a set. Reconciler checks one PayPal capture and whether the shop processed the replay twice. Unit tests and shop build pass. | Fresh failed and patched Sandbox orders; verify the same event is recorded twice before and once after BUG-09. Replay alone cannot create a PayPal capture. |
+| F7 assistant | The shop records refund requests locally. The reconciler scopes them to the current order and keeps app-only IDs out of PayPal refund evidence. A failed chat request returns ERROR rather than a false PASS. | Fresh local run and patch rerun. State clearly that no PayPal refund API is called. |
+| F4 semantics | The active proxy substitutes an invoice response failure. | Keep the simulation label, or capture a separate real PayPal duplicate-invoice response. |
+| F2 timing | Scenario fixture and active proxy now both specify a one-second delay before the proxy substitutes HTTP 504. | A new live timing trace would confirm the delay in a fresh run. |
+| Hosted preview | Render blueprint uses the fixture API. Public execution of patched code is disabled. | Verify the deployed URL and Studio behavior after deployment; use local Docker for live Sandbox runs. |
+
+The current session could run unit tests and the TypeScript build, but Docker's daemon was unavailable, so it did not add new live Sandbox evidence for F5–F7.
+
+## Decisions and tradeoffs
+
+- Keep the seeded shop bugs. Removing them would make the demo look safer by eliminating the test target, not by repairing it. Apply fixes only to a temporary copy during verification.
+- Keep the hosted API fixture-backed. Public patch execution would run generated Node code; an isolated worker and abuse controls are required before exposing that path.
+- Count F6 webhook deliveries in an event history, while retaining a set for deduplication. A set alone made the duplicate invisible to the reconciler. A duplicated event is an app-processing fault, not a second PayPal charge.
+- Scope F7 shop refunds to the current order and keep their IDs out of `paypal_refund_ids`. Otherwise an earlier shop-only refund could fail a new run or be misreported as a PayPal refund.

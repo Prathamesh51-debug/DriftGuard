@@ -67,8 +67,9 @@ the dashboard API.
 
 ## Limits that remain
 
-- F2's active proxy substitutes HTTP 504 after a 1-second wait; the scenario
-  fixture describes 6 seconds. The live proof covers the active mechanism.
+- F2's active proxy substitutes HTTP 504 after a 1-second wait. The scenario
+  fixture was later corrected from 6 seconds to 1 second; the saved live proof
+  covers the active 1-second mechanism.
 - F4's active proxy simulates an invoice response failure. It does not prove
   handling of PayPal's actual duplicate-invoice error. The shop currently
   creates a new cart identity when its HTTP route receives no `cartId`, so

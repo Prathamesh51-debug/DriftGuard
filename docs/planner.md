@@ -1,5 +1,7 @@
 # DRIFTGUARD TEAM EXECUTION PLANNER 
 
+> Historical planning document (October 2026). It records targets and proposed approaches, not a verified feature list. For current behavior and evidence, read the [README](../README.md) and [integration handoff](../reports/integration-handoff.md).
+
 PayPal AI Hackathon 2026 | Revised Edition: Oct 27 (IST) | Code freeze: Nov 10 | Submit: Nov 12 
 
 This planner turns the DriftGuard build plan into a daily schedule with a named owner for every task. It incorporates the re-balanced role assignments to protect the critical path. The golden rule remains: AI proposes, code decides. 

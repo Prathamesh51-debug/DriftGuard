@@ -1,5 +1,7 @@
 # DriftGuard Architecture & Engineering Decision Log
 
+> This is a dated record of decisions and experiments. Later implementation may differ; check the [README](../README.md) and [saved evaluation](../evals/fixer/results/live-fixer-eval.md) for current claims.
+
 *Format: Append-only ledger of architecture decisions, spike outcomes, and critical path consensus.*
 
 ---
