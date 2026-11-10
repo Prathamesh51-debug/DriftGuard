@@ -65,6 +65,25 @@ equal-price purchase. These are **one accepted model sample per bug**, not a
 repeated live model pass-rate estimate. The direct runs were not stored through
 the dashboard API.
 
+## Additional local Sandbox runs — 10 November 2026
+
+F5–F7 were run sequentially through the local engine, mitmproxy, demo shop, and
+PayPal Sandbox. Each patched child used a fresh Sandbox order. The engine used
+curated offline patches (`DRIFTGUARD_LLM=none`); no Anthropic model call was
+made for these runs.
+
+| Fault / bug | Original run | Verified child | Original | Patched | PayPal observation |
+|---|---|---|---|---|---|
+| F5 / BUG-05 | `run_ebb4eaa4` | `run_22e8683d` | FAIL · $38.92 | PASS · $38.96 | Order `15D529906R651360B` → `9AF32480U3527900U`; one capture each. Patch SHA-256: `0584e1f728292497e44e3cff0887af0b5662264eff3aff8c97d3db44856ebb48`. |
+| F6 / BUG-09 | `run_a65379d0` | `run_8e418d1b` | FAIL · event delivered twice | PASS · event delivered once | Order `6GX56635YJ4874153` → `0K9952839N919113H`; one PayPal capture each. Patch SHA-256: `a246c3800e14f268d5f7aaa48c4436c44d93cfe176f7d66b1b6be3fd3a5f2483`. |
+| F7 / BUG-10 | `run_c337b012` | `run_67131ddf` | FAIL · shop recorded refund request | PASS · guard denied request | Order `9ED39583JB535684V` → `51T99723V5567134W`; one PayPal capture each, zero PayPal refunds. Patch SHA-256: `f12aed906c0aa0be04d6c54e918edebd92313f73d8991d36b73609264be96024`. |
+
+For F6, the duplicate is application webhook processing: PayPal still has one
+capture. For F7, the seeded shop originally recorded a simulated refund request;
+the patched shop denies it. Neither run calls PayPal's Refund API. Earlier
+attempts that errored before creating a PayPal order are excluded. Together
+F1–F7 now have one curated patch red-to-green pair each in the local Sandbox.
+
 ## Limits that remain
 
 - F2's active proxy substitutes HTTP 504 after a 1-second wait. The scenario

@@ -21,9 +21,9 @@ The **hosted Render site is an interactive explorer of recorded examples**. It u
 | F2 · simulated gateway timeout | Proxy returns a 504 after a one-second delay | Local Sandbox FAIL → PASS saved |
 | F3 · declined instrument | Sandbox decline path tests shop accounting | Local Sandbox FAIL → PASS saved |
 | F4 · invoice response fault | Proxy simulates an invoice response failure | Local Sandbox FAIL → PASS saved; not a real PayPal duplicate-invoice response |
-| F5 · tax rounding | Shop calculates a total from subtotal and tax rate | Fixture and local code checks; fresh live proof pending |
-| F6 · webhook replay | Same capture event sent twice to shop | Fixture and local code checks; replay cannot create a second PayPal capture |
-| F7 · prompt injection | Buyer message asks shop assistant for an excessive refund | Shop-state simulation; no PayPal refund API call |
+| F5 · tax rounding | Shop calculates a total from subtotal and tax rate | Local Sandbox FAIL → PASS on fresh orders |
+| F6 · webhook replay | Same capture event sent twice to shop | Local Sandbox FAIL → PASS; one PayPal capture in both runs |
+| F7 · prompt injection | Buyer message asks shop assistant for an excessive refund | Local Sandbox FAIL → PASS; refund behavior is shop-side only |
 
 ## How we used the tools
 
@@ -42,6 +42,6 @@ The patch loop needs a second, distinct order. A diff that applies, compiles, or
 
 ## What comes next
 
-Run F5–F7 through the full local Sandbox loop and save parent/child evidence. Isolate proxy fault settings per run before concurrent execution. Add a separate execution boundary before offering patch reruns on a public service. Expand beyond the seeded shop only after those controls are in place.
+The F5–F7 local Sandbox parent/child records are now saved in the [evaluation report](../evals/fixer/results/live-fixer-eval.md). Remaining work is to isolate proxy fault settings before concurrent execution, verify the deployed Render build after its next deploy, and add a separate execution boundary before offering patch reruns on a public service. Expand beyond the seeded shop only after those controls are in place.
 
 **Video link:** add the public three-minute video URL to the Devpost submission when it is ready. No video asset is stored in this repository.

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="title desc">
+  <title id="title">DriftGuard — payment fault testing with evidence</title>
+  <desc id="desc">A deep navy technical card. A PayPal Sandbox request passes through a fault injector to a shop; an evidence ledger compares the payment provider with the shop record.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a2c"/>
+      <stop offset="1" stop-color="#182944"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#c7d5ec" stroke-opacity=".055" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#07101d" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="520" rx="28" fill="url(#bg)"/>
+  <rect width="1280" height="520" rx="28" fill="url(#grid)"/>
+  <path d="M36 1h1208" stroke="#8fa9ca" stroke-opacity=".15"/>
+  <g font-family="Inter, Segoe UI, Arial, sans-serif">
+    <g transform="translate(62 54)">
+      <rect width="44" height="44" rx="13" fill="#285de6"/>
+      <path d="M12 16.5c0-2 1.6-3.5 3.6-3.5h12.8c2 0 3.6 1.5 3.6 3.5v8c0 2-1.6 3.5-3.6 3.5h-7.7l-4.5 4v-4h-.6c-2 0-3.6-1.5-3.6-3.5z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="19" cy="20.5" r="1.2" fill="#fff"/><circle cx="24" cy="20.5" r="1.2" fill="#fff"/><circle cx="29" cy="20.5" r="1.2" fill="#fff"/>
+      <text x="58" y="19" fill="#f4f3ef" font-size="17" font-weight="700" letter-spacing=".4">DRIFTGUARD</text>
+      <text x="58" y="39" fill="#9eb2cd" font-size="12" letter-spacing="1.6">PAYMENT FAULT TESTING</text>
+    </g>
+    <g transform="translate(62 150)">
+      <text fill="#f7f5ef" font-size="52" font-weight="720" letter-spacing="-1.7">The payment timed out.</text>
+      <text y="62" fill="#f7f5ef" font-size="52" font-weight="720" letter-spacing="-1.7">Did it still go through?</text>
+      <text y="111" fill="#b8c8dc" font-size="18">DriftGuard tests the retry, then checks PayPal Sandbox records against the shop.</text>
+    </g>
+    <g transform="translate(62 337)">
+      <rect width="178" height="42" rx="21" fill="#285de6"/>
+      <circle cx="22" cy="21" r="5" fill="#dce6ff"/>
+      <text x="38" y="26" fill="#fff" font-size="13" font-weight="650">PAYPAL SANDBOX</text>
+      <rect x="192" width="169" height="42" rx="21" fill="#22334a" stroke="#49617f"/>
+      <circle cx="214" cy="21" r="5" fill="#60d5b1"/>
+      <text x="230" y="26" fill="#e5edf6" font-size="13" font-weight="600">EVIDENCE FIRST</text>
+    </g>
+  </g>
+  <g transform="translate(720 106)" filter="url(#shadow)" font-family="Inter, Segoe UI, Arial, sans-serif">
+    <rect width="500" height="308" rx="20" fill="#f7f5ef"/>
+    <text x="27" y="36" fill="#667286" font-size="11" font-weight="700" letter-spacing="1.8">ONE CHECKOUT · TWO RECORDS</text>
+    <g transform="translate(27 57)">
+      <rect width="128" height="61" rx="12" fill="#e8efff"/>
+      <circle cx="18" cy="18" r="5" fill="#285de6"/>
+      <text x="31" y="22" fill="#60708a" font-size="10" font-weight="700" letter-spacing="1">SANDBOX</text>
+      <text x="16" y="47" fill="#15243b" font-size="15" font-weight="700">Capture · $38.97</text>
+      <path d="M139 30h31" stroke="#8da0ba" stroke-width="2"/><path d="m164 24 8 6-8 6" fill="none" stroke="#8da0ba" stroke-width="2"/>
+      <rect x="181" width="128" height="61" rx="12" fill="#f0eee8"/>
+      <circle cx="199" cy="18" r="5" fill="#ec765e"/>
+      <text x="212" y="22" fill="#6d6d6a" font-size="10" font-weight="700" letter-spacing="1">SHOP</text>
+      <text x="197" y="47" fill="#15243b" font-size="15" font-weight="700">Capture · missing</text>
+      <rect x="322" y="9" width="124" height="43" rx="11" fill="#fff0ec"/>
+      <text x="342" y="27" fill="#ae4d3d" font-size="10" font-weight="700" letter-spacing="1">VERDICT</text>
+      <text x="342" y="43" fill="#9b3f32" font-size="13" font-weight="750">FAIL · $38.97</text>
+    </g>
+    <path d="M27 141h446" stroke="#dedbd3"/>
+    <text x="27" y="169" fill="#667286" font-size="11" font-weight="700" letter-spacing="1.8">THE TEST LOOP</text>
+    <g transform="translate(27 187)">
+      <g>
+        <rect width="94" height="75" rx="12" fill="#fff" stroke="#e5e2db"/>
+        <text x="15" y="26" fill="#285de6" font-size="11" font-weight="750">01</text>
+        <text x="15" y="49" fill="#17263e" font-size="13" font-weight="700">Create</text>
+        <text x="15" y="65" fill="#788396" font-size="10">Sandbox order</text>
+      </g>
+      <path d="M101 38h17" stroke="#9caabd" stroke-width="2"/><path d="m113 33 6 5-6 5" fill="none" stroke="#9caabd" stroke-width="2"/>
+      <g transform="translate(124)">
+        <rect width="94" height="75" rx="12" fill="#fff" stroke="#e5e2db"/>
+        <text x="15" y="26" fill="#285de6" font-size="11" font-weight="750">02</text>
+        <text x="15" y="49" fill="#17263e" font-size="13" font-weight="700">Disrupt</text>
+        <text x="15" y="65" fill="#788396" font-size="10">Proxy fault</text>
+      </g>
+      <path d="M225 38h17" stroke="#9caabd" stroke-width="2"/><path d="m237 33 6 5-6 5" fill="none" stroke="#9caabd" stroke-width="2"/>
+      <g transform="translate(248)">
+        <rect width="94" height="75" rx="12" fill="#fff" stroke="#e5e2db"/>
+        <text x="15" y="26" fill="#285de6" font-size="11" font-weight="750">03</text>
+        <text x="15" y="49" fill="#17263e" font-size="13" font-weight="700">Compare</text>
+        <text x="15" y="65" fill="#788396" font-size="10">PayPal + shop</text>
+      </g>
+      <path d="M349 38h17" stroke="#9caabd" stroke-width="2"/><path d="m361 33 6 5-6 5" fill="none" stroke="#9caabd" stroke-width="2"/>
+      <g transform="translate(372)">
+        <rect width="74" height="75" rx="12" fill="#e6f5ef" stroke="#cfe8dd"/>
+        <text x="13" y="26" fill="#24836a" font-size="11" font-weight="750">04</text>
+        <text x="13" y="49" fill="#155e4e" font-size="13" font-weight="700">Rerun</text>
+        <text x="13" y="65" fill="#538578" font-size="10">New order</text>
+      </g>
+    </g>
+  </g>
+  <text x="62" y="472" fill="#8195b0" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="12" letter-spacing=".5">LOCAL SANDBOX RUNS · FIXTURES ON THE HOSTED PREVIEW · EVIDENCE LINKED BELOW</text>
+</svg>

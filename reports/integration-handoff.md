@@ -2,7 +2,7 @@
 
 ## Saved live evidence
 
-The local engine has stored F1–F4 failed parent runs and passing child runs on distinct PayPal Sandbox orders after curated patches. The [fixer evaluation](../evals/fixer/results/live-fixer-eval.md) gives exact run IDs, patch hashes, observations, and separate Claude candidate evidence. These runs were sequential. They do not measure reliability on other shops.
+The local engine has stored F1–F7 failed parent runs and passing child runs on distinct PayPal Sandbox orders after curated patches. The [fixer evaluation](../evals/fixer/results/live-fixer-eval.md) gives exact run IDs, patch hashes, observations, and separate Claude candidate evidence. These runs were sequential. They do not measure reliability on other shops.
 
 The Explainer evaluated four saved Sandbox failures with Claude. Its [result note](../evals/explainer/results/README.md) records the bounded claim check. The [projector check](projector-qa.md) covers local Chromium layout only.
 
@@ -10,14 +10,14 @@ The Explainer evaluated four saved Sandbox failures with Claude. Its [result not
 
 | Gate | Current state | Evidence needed |
 |---|---|---|
-| F5 amount | Runner now sends the `35.99` subtotal and tax rate, not the expected `38.96` as the checkout input. BUG-05 patch context matches the current seeded rounding code. Unit tests and shop build pass. | Fresh failed and patched Sandbox orders with exact PayPal totals and patch hash. |
-| F6 replay | Runner uses the capture ID from the checkout and a unique event ID per order. Shop state now exposes repeated event deliveries rather than collapsing them to a set. Reconciler checks one PayPal capture and whether the shop processed the replay twice. Unit tests and shop build pass. | Fresh failed and patched Sandbox orders; verify the same event is recorded twice before and once after BUG-09. Replay alone cannot create a PayPal capture. |
-| F7 assistant | The shop records refund requests locally. The reconciler scopes them to the current order and keeps app-only IDs out of PayPal refund evidence. A failed chat request returns ERROR rather than a false PASS. | Fresh local run and patch rerun. State clearly that no PayPal refund API is called. |
+| F5 amount | Verified. Parent `run_ebb4eaa4` failed at $38.92; child `run_22e8683d` passed at $38.96 on a new Sandbox order. | Closed for the seeded shop. BUG-05 patch hash and PayPal IDs are in the evaluation report. |
+| F6 replay | Verified. Parent `run_a65379d0` recorded the same event twice; child `run_8e418d1b` recorded it once. PayPal showed one capture in each run. | Closed for the seeded shop. Replay cannot create a second PayPal capture. |
+| F7 assistant | Verified. Parent `run_c337b012` recorded one shop-side refund request; child `run_67131ddf` rejected it. PayPal's refund list was empty in both runs. | Closed for the shop-side guard. This does not test the PayPal Refund API. |
 | F4 semantics | The active proxy substitutes an invoice response failure. | Keep the simulation label, or capture a separate real PayPal duplicate-invoice response. |
 | F2 timing | Scenario fixture and active proxy now both specify a one-second delay before the proxy substitutes HTTP 504. | A new live timing trace would confirm the delay in a fresh run. |
-| Hosted preview | Render blueprint uses the fixture API. Public execution of patched code is disabled. | Verify the deployed URL and Studio behavior after deployment; use local Docker for live Sandbox runs. |
+| Hosted preview | Render blueprint uses the fixture API. Public execution of patched code is disabled. | Verify the currently deployed URL and Studio behavior; use local Docker for live Sandbox runs. |
 
-The current session could run unit tests and the TypeScript build, but Docker's daemon was unavailable, so it did not add new live Sandbox evidence for F5–F7.
+F5–F7 were run sequentially through the local engine, proxy, shop, and PayPal Sandbox. Earlier ERROR attempts that failed before an order was created are excluded from the proof. Concurrent runs remain unsupported because proxy fault selection is shared.
 
 ## Decisions and tradeoffs
 
