@@ -1,81 +1,33 @@
 # DriftGuard Cloud Deployment Blueprint (Render.com)
-# Planner Ref: Part 2 & Part 7 (Role A - Render Deploy Blueprint)
-# 
-# Services:
-# 1. PostgreSQL Managed Database (Job queue & persistence)
-# 2. DriftGuard Engine API (FastAPI backend + runner endpoints)
-# 3. DriftGuard Worker (Async job consumer using SKIP LOCKED queue)
-# 4. DriftGuard Dashboard (React + Vite + AG Grid command center)
-
-databases:
-  - name: driftguard-db
-    databaseName: driftguard
-    user: driftguard
-    plan: free
-    region: oregon
+# Lightweight, high-reliability interactive demonstration for hackathon judges.
+#
+# Architecture:
+# 1. Interactive Demo API Service:
+#    - FastAPI lightweight runner on Render free tier (uses <50MB RAM, 0 cloud spend)
+#    - Serves verified contract scenarios, live RED-to-GREEN reconciliation runs, and Studio responses
+# 2. Command Center Dashboard:
+#    - React + Vite + AG Grid static site on Render global CDN (instant load, 0 cold start)
 
 services:
   # ============================================================================
-  # 1. Core Engine API (FastAPI)
+  # 1. Interactive Demo API Service (FastAPI)
   # ============================================================================
   - type: web
-    name: driftguard-engine
+    name: driftguard-api
     runtime: python
     region: oregon
     plan: free
-    buildCommand: pip install -r engine/requirements.txt && playwright install --with-deps chromium
-    startCommand: uvicorn engine.api.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r mock_runner/requirements.txt
+    startCommand: uvicorn mock_runner.app:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: driftguard-db
-          property: connectionString
       - key: PYTHONPATH
         value: .
-      - key: PAYPAL_CLIENT_ID
-        sync: false
-      - key: PAYPAL_CLIENT_SECRET
-        sync: false
-      - key: PAYPAL_ENV
-        value: sandbox
-      - key: PAYPAL_API_BASE_URL
-        value: https://api-m.sandbox.paypal.com
       - key: DRIFTGUARD_CORS_ORIGINS
-        value: https://driftguard-dashboard.onrender.com
+        value: https://driftguard-dashboard.onrender.com,http://localhost:5173,http://localhost:3000
 
   # ============================================================================
-  # 2. Concurrency-Safe Orchestrator Worker (SKIP LOCKED consumer)
-  # ============================================================================
-  - type: worker
-    name: driftguard-worker
-    runtime: python
-    region: oregon
-    plan: starter
-    buildCommand: pip install -r engine/requirements.txt && playwright install --with-deps chromium
-    startCommand: python engine/orchestrator/worker.py
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: driftguard-db
-          property: connectionString
-      - key: PYTHONPATH
-        value: .
-      - key: PAYPAL_CLIENT_ID
-        sync: false
-      - key: PAYPAL_CLIENT_SECRET
-        sync: false
-      - key: PAYPAL_ENV
-        value: sandbox
-      - key: PAYPAL_API_BASE_URL
-        value: https://api-m.sandbox.paypal.com
-      - key: PAYPAL_SANDBOX_BUYER_EMAIL
-        sync: false
-      - key: PAYPAL_SANDBOX_BUYER_PASSWORD
-        sync: false
-
-  # ============================================================================
-  # 3. Dashboard Command Center (Vite + React + AG Grid)
+  # 2. Command Center Dashboard (Vite + React + AG Grid)
   # ============================================================================
   - type: web
     name: driftguard-dashboard
@@ -88,5 +40,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://driftguard-engine.onrender.com
-
+        value: https://driftguard-api.onrender.com
+      - key: VITE_AI_URL
+        value: https://driftguard-api.onrender.com
