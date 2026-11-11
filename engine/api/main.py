@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from contracts import Result, Scenario, Verdict, ObservedState, Evidence, FaultType
 from engine.orchestrator import db, run_scenario
@@ -130,19 +130,23 @@ def health() -> dict:
 
 @app.get("/runs", response_model=List[Run])
 def list_runs() -> List[Run]:
-    raw_runs = db.list_runs()
-    return [
-        Run(
-            run_id=r["run_id"],
-            status=r["status"],
-            created_at=r["created_at"],
-            scenario=Scenario.model_validate(r["scenario"]),
-            result=Result.model_validate(r["result"]) if r.get("result") else None,
-            rerun_of=r.get("rerun_of"),
-            fix=r.get("fix"),
-        )
-        for r in raw_runs
-    ]
+    runs: List[Run] = []
+    for r in db.list_runs():
+        try:
+            runs.append(
+                Run(
+                    run_id=r["run_id"],
+                    status=r["status"],
+                    created_at=r["created_at"],
+                    scenario=Scenario.model_validate(r["scenario"]),
+                    result=Result.model_validate(r["result"]) if r.get("result") else None,
+                    rerun_of=r.get("rerun_of"),
+                    fix=r.get("fix"),
+                )
+            )
+        except (ValidationError, KeyError, TypeError, ValueError) as exc:
+            print(f"[API] Skipping invalid stored run {r.get('run_id')}: {exc}")
+    return runs
 
 
 @app.post("/runs", response_model=Run, status_code=201)
