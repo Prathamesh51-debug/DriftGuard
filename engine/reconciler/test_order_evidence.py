@@ -120,3 +120,19 @@ def test_f7_shop_refund_never_becomes_paypal_refund_evidence(monkeypatch, tmp_pa
     assert result.verdict == Verdict.FAIL
     assert result.observed.refunds_issued == 1
     assert result.evidence.paypal_refund_ids == []
+
+
+def test_non_f6_evidence_ignores_stale_webhooks_from_other_orders(monkeypatch, tmp_path):
+    scenario = Scenario.model_validate_json((FIXTURES / "f1_scenario.json").read_text())
+    ledger = {"captures": [{"id": "capture-1"}], "capture_ids": ["capture-1"],
+              "refunds": [], "refund_ids": [], "total_captured_amount": "38.97"}
+    client = SimpleNamespace(get_order=lambda _id: {}, parse_order_ledger=lambda _raw: ledger)
+    monkeypatch.setattr(module, "fetch_app_state", lambda _url: {
+        "orders": [{"orderId": "current", "captureCount": 0}],
+        "webhookEventsProcessed": ["WH-REPLAY-998877-older", "WH-REPLAY-998877-older"],
+    })
+    result = module.reconcile_order(scenario, "current", client=client,
+                                    log_path=tmp_path / "empty-audit.jsonl")
+    assert result.verdict == Verdict.FAIL
+    assert result.evidence.webhook_event_ids == []
+

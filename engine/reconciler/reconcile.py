@@ -451,7 +451,7 @@ def reconcile_order(
             replay_event_id = f"{base_event_id}-{order_id}"
             webhook_ids = [event_id for event_id in all_webhook_ids if event_id == replay_event_id]
         else:
-            webhook_ids = all_webhook_ids
+            webhook_ids = [event_id for event_id in all_webhook_ids if order_id and order_id in event_id]
 
     evidence = Evidence(
         paypal_order_ids=created_orders,
