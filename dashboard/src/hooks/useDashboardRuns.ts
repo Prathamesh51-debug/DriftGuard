@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { launchRun, listRuns, proposeFix, rerunRun, verifyFixRun } from '../api'
-import { nextPollDelay } from '../polling'
+import { nextPollDelay, retainUnchangedRuns } from '../polling'
 import type { FixState, Run } from '../types'
 
 export function useDashboardRuns() {
@@ -16,7 +16,8 @@ export function useDashboardRuns() {
 
   const refresh = useCallback(async (): Promise<boolean> => {
     try {
-      setRuns(await listRuns())
+      const next = await listRuns()
+      setRuns((current) => retainUnchangedRuns(current, next))
       setOffline(false)
       if (wasOffline.current) {
         wasOffline.current = false

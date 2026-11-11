@@ -161,7 +161,7 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
         {view === 'studio' ? (
           <StudioBoundary>
             <Suspense fallback={<p className="muted">Loading Studio…</p>}>
-              <StudioPanel runs={runs} sampleMode={sampleMode} />
+              <StudioPanel runs={runs} sampleMode={sampleMode} theme={theme} />
             </Suspense>
           </StudioBoundary>
         ) : view === 'overview' ? (

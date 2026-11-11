@@ -1,10 +1,9 @@
 import type { AgReportState } from 'ag-studio'
 
-const COLOR = { bg: '#0e1116', card: '#171c24', line: '#262d38' }
 /** Field ids in widget configs are `<source id>.<field id>`. */
 const f = (field: string) => `runs.${field}`
 const title = (text: string) => ({
-  title: { text, enabled: true, color: '#9aa4b2', typography: { fontSize: 13, fontWeight: 'bold' as const } },
+  title: { text, enabled: true, typography: { fontSize: 13, fontWeight: 'bold' as const } },
 })
 const bigNumber = (text: string, color?: string) => ({
   ...title(text),
@@ -21,9 +20,6 @@ export const initialReport: AgReportState = {
         columns: 12,
         rowHeight: 56,
         pagePadding: 12,
-        backgroundColor: COLOR.bg,
-        widgetBackgroundColor: COLOR.card,
-        widgetBorderColor: COLOR.line,
         widgetBorderRadius: 8,
       },
       widgets: {
