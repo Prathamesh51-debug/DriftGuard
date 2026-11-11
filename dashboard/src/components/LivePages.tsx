@@ -376,7 +376,7 @@ export function RunDetailPage({
             <div className="notice notice-error"><strong>The test could not complete</strong><p>{result.error_message || result.rule}</p></div>
           ) : (
             <>
-              <ComparisonProof before={comparisonBefore} after={comparisonAfter} />
+              <ComparisonProof before={comparisonBefore} after={comparisonAfter} focusAfter={Boolean(parent)} />
               <h2>What happened</h2>
               <ul className="s02-timeline">
                 <li><i aria-hidden="true" /><span>{run.mode === 'sample' ? 'The sample illustrates' : 'DriftGuard injected'} {scenario.inject.action} on {scenario.inject.on}.</span></li>
@@ -440,7 +440,7 @@ function isRevealedPass(run?: Run): boolean {
   return run?.result?.verdict === 'PASS' && (run.mode === 'sample' || Boolean(run.fix?.patch_sha256))
 }
 
-function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
+function ComparisonProof({ before, after, focusAfter = false }: { before: Run; after?: Run; focusAfter?: boolean }) {
   const [pop, setPop] = useState(false)
   const proofRef = useRef<HTMLDivElement>(null)
   const splitRef = useRef(80)
@@ -457,14 +457,16 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     if (verdict === 'PASS') return isRevealedPass(run) ? 'is-good' : 'is-pending'
     return 'is-bad'
   }
+  const hasAfter = Boolean(after)
   const afterRevealedPass = isRevealedPass(after)
   const afterLiveVerified = after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && Boolean(after.fix?.patch_sha256)
 
   useEffect(() => {
     const proof = proofRef.current
     if (!proof) return
-    const endAt = afterRevealedPass ? 20 : 80
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    // Only slide open to PASS when viewing the repeat/PASS run itself; keep a FAIL run focused on FAIL.
+    const endAt = focusAfter && afterRevealedPass ? 20 : 80
+    if ((!focusAfter && hasAfter) || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       splitRef.current = endAt
       proof.style.setProperty('--split', `${endAt}%`)
       return
@@ -532,7 +534,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
       if (popTimer != null) window.clearTimeout(popTimer)
       window.cancelAnimationFrame(frame)
     }
-  }, [afterRevealedPass, afterLiveVerified])
+  }, [afterRevealedPass, afterLiveVerified, focusAfter, hasAfter])
 
   const handleSplit = (value: number) => {
     autoRef.current = false
@@ -568,7 +570,31 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
           onChange={(event) => handleSplit(Number(event.target.value))}
         />
       </div>
-      <p className="s02-proof-caption">{after?.mode === 'sample' ? 'Prepared PASS fixture shown for comparison. No patch was applied and no new PayPal order was made.' : after?.fix?.patch_sha256 ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.' : after ? 'This repeat has no verified patch, so it cannot prove a fix.' : before.mode === 'sample' ? 'Show the sample outcome to compare both fixtures.' : 'Generate and verify a fix to compare both runs.'}</p>
+      <p className="s02-proof-caption">
+        {!focusAfter && after ? (
+          <>
+            {after.mode === 'sample'
+              ? 'This sample failed. Prepared PASS fixture '
+              : after.fix?.patch_sha256
+                ? 'This run failed. A later patched repeat ('
+                : 'This run failed. A later repeat ('}
+            <a className="s02-run-link" href={`/live/runs/${encodeURIComponent(after.run_id)}`}>{shortId(after.run_id)}</a>
+            {after.mode === 'sample'
+              ? ' is available for comparison — drag left to preview.'
+              : after.fix?.patch_sha256
+                ? ') passed — drag left to compare.'
+                : ') exists — drag left to compare.'}
+          </>
+        ) : after?.mode === 'sample'
+          ? 'Prepared PASS fixture shown for comparison. No patch was applied and no new PayPal order was made.'
+          : after?.fix?.patch_sha256
+            ? 'Same scenario, new PayPal order, patched shop copy. The patch and verdict are stored with this run.'
+            : after
+              ? 'This repeat has no verified patch, so it cannot prove a fix.'
+              : before.mode === 'sample'
+                ? 'Show the sample outcome to compare both fixtures.'
+                : 'Generate and verify a fix to compare both runs.'}
+      </p>
     </section>
   )
 }
