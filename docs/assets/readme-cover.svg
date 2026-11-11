@@ -17,12 +17,14 @@
   <rect width="1280" height="520" rx="28" fill="url(#grid)"/>
   <path d="M36 1h1208" stroke="#8fa9ca" stroke-opacity=".15"/>
   <g font-family="Inter, Segoe UI, Arial, sans-serif">
-    <g transform="translate(62 54)">
-      <rect width="44" height="44" rx="13" fill="#285de6"/>
-      <path d="M12 16.5c0-2 1.6-3.5 3.6-3.5h12.8c2 0 3.6 1.5 3.6 3.5v8c0 2-1.6 3.5-3.6 3.5h-7.7l-4.5 4v-4h-.6c-2 0-3.6-1.5-3.6-3.5z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
-      <circle cx="19" cy="20.5" r="1.2" fill="#fff"/><circle cx="24" cy="20.5" r="1.2" fill="#fff"/><circle cx="29" cy="20.5" r="1.2" fill="#fff"/>
-      <text x="58" y="19" fill="#f4f3ef" font-size="17" font-weight="700" letter-spacing=".4">DRIFTGUARD</text>
-      <text x="58" y="39" fill="#9eb2cd" font-size="12" letter-spacing="1.6">PAYMENT FAULT TESTING</text>
+    <g transform="translate(62 48)">
+      <rect width="50" height="50" rx="14" fill="#285de6"/>
+      <g transform="translate(3 3)">
+        <path d="M12 16.5c0-2 1.6-3.5 3.6-3.5h12.8c2 0 3.6 1.5 3.6 3.5v8c0 2-1.6 3.5-3.6 3.5h-7.7l-4.5 4v-4h-.6c-2 0-3.6-1.5-3.6-3.5z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="19" cy="20.5" r="1.2" fill="#fff"/><circle cx="24" cy="20.5" r="1.2" fill="#fff"/><circle cx="29" cy="20.5" r="1.2" fill="#fff"/>
+      </g>
+      <text x="66" y="24" fill="#ffffff" font-size="24" font-weight="800" letter-spacing="1.2">DRIFTGUARD</text>
+      <text x="66" y="45" fill="#a4bcdb" font-size="12" font-weight="600" letter-spacing="2">PAYMENT FAULT TESTING</text>
     </g>
     <g transform="translate(62 150)">
       <text fill="#f7f5ef" font-size="52" font-weight="720" letter-spacing="-1.7">The payment timed out.</text>
