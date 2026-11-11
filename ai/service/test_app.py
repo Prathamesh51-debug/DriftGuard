@@ -170,3 +170,11 @@ def test_fix_never_edits_the_shop(fixer):
     before = shop_file.read_bytes()
     fixer(OfflineLLM()).post("/fix", json={"scenario": SCENARIO, "result": FAIL})
     assert shop_file.read_bytes() == before
+
+
+def test_get_backend_disables_brotli_encoding(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+    backend = get_backend()
+    assert backend is not None
+    assert backend.client.default_headers.get("Accept-Encoding") == "gzip, deflate"
+

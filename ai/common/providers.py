@@ -140,6 +140,16 @@ def _anthropic_errors() -> tuple:
     return (anthropic.APIError,)
 
 
+def anthropic_client(api_key: Optional[str]):
+    """Build an Anthropic SDK client that avoids Brotli responses.
+
+    mitmproxy pins Brotli<=1.1.0, whose Decompressor.process rejects httpx2's output_buffer_limit kwarg.
+    """
+    import anthropic
+
+    return anthropic.Anthropic(api_key=api_key, default_headers={"Accept-Encoding": "gzip, deflate"})
+
+
 class AnthropicClient:
     name = "anthropic"
 
@@ -147,8 +157,7 @@ class AnthropicClient:
                  guard: Optional[SpendGuard] = None, client=None):
         self.model, self.guard = model, guard
         if client is None:
-            import anthropic
-            client = anthropic.Anthropic(api_key=api_key)
+            client = anthropic_client(api_key)
         self.client = client
 
     def complete(self, system: str, user: str) -> str:

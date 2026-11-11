@@ -13,6 +13,7 @@ code has checked (one allowed file, small, applies to a scratch copy). It never 
 Planner Ref: Part 8 (Studio agent skeleton, before/after view, Wed 4 Nov).
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,9 +23,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from ai.common.llm import LLMClient, LLMError
-from ai.common.providers import DEFAULT_MODELS, OfflineLLM, SpendGuard, _key, cost_usd, llm_from_env
+from ai.common.providers import DEFAULT_MODELS, OfflineLLM, SpendGuard, _key, anthropic_client, cost_usd, llm_from_env
 from ai.fixer import FixProposal, find_bug, load_bugs, propose_fix
 from contracts import Result, Scenario, Verdict
+
+logger = logging.getLogger(__name__)
 
 SHOP_DIR = Path(__file__).resolve().parents[2] / "targets" / "demo-shop"
 MAX_OUTPUT_TOKENS = 2048
@@ -52,10 +55,8 @@ def get_backend() -> Optional[ModelBackend]:
     key = _key("ANTHROPIC_API_KEY")
     if key is None:
         return None
-    import anthropic
-
     return ModelBackend(
-        anthropic.Anthropic(api_key=key),
+        anthropic_client(key),
         os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODELS["anthropic"],
         SpendGuard(float(os.getenv("ANTHROPIC_SPEND_LIMIT_USD", "1.50"))),
     )
@@ -107,6 +108,7 @@ def llm_messages(req: TurnRequest, backend: Optional[ModelBackend] = Depends(get
     try:
         msg = backend.client.messages.create(**body)
     except anthropic.APIError as exc:
+        logger.warning("Anthropic API call failed: %s (cause=%r)", type(exc).__name__, exc.__cause__)
         raise HTTPException(502, f"Model call failed: {type(exc).__name__}") from exc
 
     backend.guard.add(cost_usd(backend.model, msg.usage.input_tokens, msg.usage.output_tokens))

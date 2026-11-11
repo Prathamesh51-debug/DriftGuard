@@ -232,3 +232,10 @@ def test_cache_reports_cache_as_the_provider(tmp_path):
     assert cached.last_provider == "up"
     cached.complete("s", "u")
     assert cached.last_provider == "cache"
+
+
+def test_anthropic_client_disables_brotli_encoding():
+    from ai.common.providers import anthropic_client
+
+    client = anthropic_client("test-key")
+    assert client.default_headers.get("Accept-Encoding") == "gzip, deflate"
