@@ -1,6 +1,7 @@
 # DriftGuard · submission copy
 
 **Repository:** https://github.com/Prathamesh51-debug/DriftGuard
+**Hosted explorer:** https://driftguard-dashboard.onrender.com
 **Team:** Swastik Bose, Kiran Patra, Prathamesh Prasad
 
 ## What we built
@@ -9,11 +10,11 @@ A checkout request can reach PayPal even when its response never reaches the mer
 
 DriftGuard makes that uncertainty testable. We built a TypeScript demo shop with deliberate payment bugs, a mitmproxy fault injector, a Playwright Sandbox buyer, a runner, and a reconciler. The runner creates a PayPal Sandbox order and triggers a fault. The reconciler reads PayPal order evidence and the shop's state, then produces a deterministic PASS, FAIL, or ERROR. The React dashboard makes the mismatch visible. A patch verifier can apply a proposed fix to a temporary copy of the shop, build it, and run a **new** Sandbox checkout.
 
-Our most useful lesson was that a successful API response and a successful payment are different facts. For F1, the shop lost the capture response while PayPal held a capture. The first run showed PayPal with one capture and the shop with none. After a curated patch, a fresh order showed one capture on both sides. The same local patch-and-rerun flow passed once each for F2, F3, and F4. [Saved run IDs and limitations](../evals/fixer/results/live-fixer-eval.md) are in the repository.
+Our most useful lesson was that a successful API response and a successful payment are different facts. For F1, the shop lost the capture response while PayPal held a capture. The first run showed PayPal with one capture and the shop with none. After a curated patch, a fresh order showed one capture on both sides. The same local patch-and-rerun flow passed once each across all seven faults (F1–F7), using a fresh PayPal Sandbox order per rerun. [Saved run IDs, patch hashes, and limitations](../evals/fixer/results/live-fixer-eval.md) are in the repository.
 
 ## What the demo shows
 
-The **hosted Render site is an interactive explorer of recorded examples**. It uses a fixture-backed API so a judge can browse the interface without Sandbox accounts or Docker. Hosted launch, fix, and verify actions present prepared sample outcomes; they do not make PayPal calls or execute patched code. Studio can optionally call Anthropic from the server when a key is configured; otherwise its answer is labeled as prepared. For live fault injection, run the repository locally using the [README](../README.md), or inspect the saved F1–F4 evidence.
+The **hosted Render site is an interactive explorer of recorded examples**. It uses a fixture-backed API so a judge can browse the interface without Sandbox accounts or Docker. Hosted launch, fix, and verify actions present prepared sample outcomes; they do not make PayPal calls or execute patched code. Studio can optionally call Anthropic from the server when a key is configured; otherwise its answer is labeled as prepared. For live fault injection, run the repository locally using the [README](../README.md), or inspect the saved F1–F7 evidence in the [evaluation report](../evals/fixer/results/live-fixer-eval.md).
 
 | Scenario | How DriftGuard breaks & checks it | Evidence status |
 |---|---|---|
@@ -30,7 +31,7 @@ The **hosted Render site is an interactive explorer of recorded examples**. It u
 - **PayPal Sandbox Orders** supplied the create, approve, capture, and order evidence for the local live runs. The demo shop is a controlled target, not a general PayPal integration scanner.
 - **mitmproxy** supplied fault timing and response substitution. Its active fault setting is shared, so the saved runs were sequential.
 - **Playwright** approved Sandbox orders as a buyer during local runs.
-- **Anthropic Claude** can propose patches and explain results. The verdict comes from code that checks observed state. The four saved product reruns in the table used curated patches; separate single-candidate Claude patch evidence is linked in the [evaluation](../evals/fixer/results/live-fixer-eval.md).
+- **Anthropic Claude** can propose patches, explain failures through Studio chat, and analyze observed evidence. The verdict always comes from deterministic code that compares PayPal and shop state. The seven saved product reruns in the table used curated patches (`DRIFTGUARD_LLM=none`); separate single-candidate Claude patch evaluations are linked in the [evaluation report](../evals/fixer/results/live-fixer-eval.md).
 - **AG Grid Community and AG Studio** present the run ledger and an interactive analysis canvas. The grid is a way to inspect evidence, not the mechanism that decides PASS.
 - **APIMatic context** was consulted while developing SDK guidance. It is not a runtime dependency in the hosted demo or a source of an automatically verified patch.
 
@@ -42,6 +43,6 @@ The patch loop needs a second, distinct order. A diff that applies, compiles, or
 
 ## What comes next
 
-The F5–F7 local Sandbox parent/child records are now saved in the [evaluation report](../evals/fixer/results/live-fixer-eval.md). Remaining work is to isolate proxy fault settings before concurrent execution, verify the deployed Render build after its next deploy, and add a separate execution boundary before offering patch reruns on a public service. Expand beyond the seeded shop only after those controls are in place.
+All seven faults (F1–F7) now have verified local Sandbox parent/child pairs saved in the [evaluation report](../evals/fixer/results/live-fixer-eval.md). Next, we plan to isolate mitmproxy fault settings per run for concurrent test execution, enforce container/VM isolation before allowing patch verification reruns on a public host, and expand beyond the seeded TypeScript shop with AST-level scanning.
 
 **Video link:** add the public three-minute video URL to the Devpost submission when it is ready. No video asset is stored in this repository.
