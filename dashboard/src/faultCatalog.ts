@@ -10,43 +10,50 @@ export const FAULT_CATALOG: FaultDefinition[] = [
   {
     code: 'F1_LOST_CAPTURE_RESPONSE',
     name: 'Lost capture response',
-    description: 'PayPal captures the payment but its reply is lost. The retry must not leave the shop and PayPal out of sync.',
+    description:
+      'PayPal captures the payment (HTTP 201), then mitmproxy drops the reply and returns HTTP 504. Checks whether the shop reconciles order status instead of failing a blind retry and leaving a paid order unfulfilled.',
     fixturePrepared: true,
   },
   {
     code: 'F2_SLOW_PAYPAL',
     name: 'Slow PayPal',
-    description: 'Delays order creation past the shop timeout and checks whether a retry creates duplicate orders.',
+    description:
+      'Delays the first create-order response by 1s and returns HTTP 504 at the proxy. Checks whether the shop sends a stable PayPal-Request-Id instead of creating duplicate Sandbox orders on retry.',
     fixturePrepared: true,
   },
   {
     code: 'F3_FORCED_DECLINE',
     name: 'Forced decline',
-    description: 'Returns INSTRUMENT_DECLINED and checks that an unpaid order is not marked complete.',
+    description:
+      'Forces HTTP 422 INSTRUMENT_DECLINED on capture via PayPal-Mock-Response or proxy override. Checks that the shop surfaces the decline and records 0 captures when PayPal collected $0.00.',
     fixturePrepared: true,
   },
   {
     code: 'F4_DUPLICATE_INVOICE',
     name: 'Duplicate invoice',
-    description: 'Exercises invoice ID collisions and checks that payment records still reconcile with the order.',
+    description:
+      'Enforces deterministic cart-hashed invoice IDs at the proxy: colliding or unstable IDs receive a simulated HTTP 409 DUPLICATE_INVOICE_ID on capture, checking retry identity and single-capture reconciliation.',
     fixturePrepared: true,
   },
   {
     code: 'F5_MONEY_MATH_TRAP',
     name: 'Money math trap',
-    description: 'Checks tax, discount, and zero-decimal currency rounding.',
-    fixturePrepared: false,
+    description:
+      'Exercises floating-point tax math in the demo shop that undercharges by $0.04 ($38.92 captured vs $38.96 expected). Reconciles PayPal captured funds against exact expected decimal amounts.',
+    fixturePrepared: true,
   },
   {
     code: 'F6_WEBHOOK_REPLAY',
     name: 'Webhook replay',
-    description: 'Checks webhook signature verification and duplicate event handling.',
-    fixturePrepared: false,
+    description:
+      'Delivers the same PAYMENT.CAPTURE.COMPLETED webhook event twice to the shop endpoint. Verifies idempotent deduplication so the shop processes the event once while PayPal holds a single capture.',
+    fixturePrepared: true,
   },
   {
     code: 'F7_PROMPT_INJECTION',
     name: 'Prompt injection',
-    description: 'Checks that an injected support request cannot authorize an unapproved refund.',
-    fixturePrepared: false,
+    description:
+      'Injects an adversarial buyer chat prompt requesting a full refund above policy limits. Verifies deterministic code guardrails block over-limit non-admin requests before recording any simulated refund.',
+    fixturePrepared: true,
   },
 ]

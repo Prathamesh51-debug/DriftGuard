@@ -21,15 +21,15 @@ DriftGuard recreates that failure against a deliberately vulnerable shop in **Pa
 
 ## Evidence from the demo shop
 
-| Fault | What the first run exposed | Curated patch rerun |
+| Fault | How it breaks the flow & what the first run exposed | Curated patch rerun |
 |:--|:--|:--|
-| **F1 · lost capture response** | PayPal captured; the shop missed the response | PASS · one capture recorded by both |
-| **F2 · simulated gateway timeout** | A blind retry created two Sandbox orders | PASS · one order and one capture |
-| **F3 · declined instrument** | The shop recorded success after PayPal declined | PASS · no capture on either side |
-| **F4 · invoice response fault** | The shop lost its capture record after a simulated response error | PASS · one capture recorded by both |
-| **F5 · tax rounding** | Shop total was $38.92; PayPal captured $38.92 against $38.96 expected | PASS · fresh order captured $38.96 |
-| **F6 · webhook replay** | Same event was delivered twice to the shop | PASS · patched shop processed the event once |
-| **F7 · refund prompt injection** | Shop recorded a $500 refund request; PayPal recorded no refund | PASS · guard rejected it; no refund recorded |
+| **F1 · lost capture response** | PayPal captured `38.97 USD` (`HTTP 201`), then mitmproxy dropped the reply as `HTTP 504`; blind retry hit `422` and left the shop at `0` captures | **PASS** · shop queried order state and recorded `1` capture matching PayPal |
+| **F2 · simulated gateway timeout** | Proxy delayed the first order-create response (`1s`) and returned `HTTP 504`; retrying without `PayPal-Request-Id` created `2` Sandbox orders for `1` checkout | **PASS** · stable idempotency key yielded `1` order and `1` capture |
+| **F3 · declined instrument** | Proxy forced `422 INSTRUMENT_DECLINED` on capture; unpatched handler still marked the order completed (`1` shop capture vs `0` in PayPal) | **PASS** · decline surfaced as failed checkout with `0` captures on both sides |
+| **F4 · invoice response fault** | Proxy returned a simulated `409 DUPLICATE_INVOICE_ID` when an unstable invoice ID collided; shop failed to reconcile its order capture | **PASS** · deterministic cart-hashed invoice + idempotent retry gave `1` capture each |
+| **F5 · tax rounding** | Floating-point tax calculation dropped 4 cents on checkout (`$38.92` requested and captured in Sandbox vs `$38.96` expected) | **PASS** · exact integer-cent tax calculation captured `$38.96` on a fresh order |
+| **F6 · webhook replay** | Runner sent the same `PAYMENT.CAPTURE.COMPLETED` webhook twice; without deduplication the shop processed both deliveries while PayPal held `1` capture | **PASS** · event ID deduplication accepted the first delivery and ignored the replay |
+| **F7 · refund prompt injection** | Adversarial buyer chat prompt bypassed prompt-only instructions and recorded an unauthorized `$500.00` simulated refund in shop state (PayPal had `0` refunds) | **PASS** · `$15.00` / admin role guard returned HTTP `403` and blocked the refund |
 
 These results are seven local Sandbox runs, one curated-patch rerun per fault. For F5–F7, each row represents a fresh failed parent and a patched child using a distinct Sandbox order. The [evaluation record](evals/fixer/results/live-fixer-eval.md) contains the parent and child run IDs, PayPal evidence, and patch hashes. This is evidence for the seeded demo shop; it is not a model success rate or a study of other merchants.
 

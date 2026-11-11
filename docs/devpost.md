@@ -15,15 +15,15 @@ Our most useful lesson was that a successful API response and a successful payme
 
 The **hosted Render site is an interactive explorer of recorded examples**. It uses a fixture-backed API so a judge can browse the interface without Sandbox accounts or Docker. Hosted launch, fix, and verify actions present prepared sample outcomes; they do not make PayPal calls or execute patched code. Studio can optionally call Anthropic from the server when a key is configured; otherwise its answer is labeled as prepared. For live fault injection, run the repository locally using the [README](../README.md), or inspect the saved F1–F4 evidence.
 
-| Scenario | Mechanism | Evidence status |
+| Scenario | How DriftGuard breaks & checks it | Evidence status |
 |---|---|---|
-| F1 · lost capture response | Proxy hides a successful capture response | Local Sandbox FAIL → PASS saved |
-| F2 · simulated gateway timeout | Proxy returns a 504 after a one-second delay | Local Sandbox FAIL → PASS saved |
-| F3 · declined instrument | Sandbox decline path tests shop accounting | Local Sandbox FAIL → PASS saved |
-| F4 · invoice response fault | Proxy simulates an invoice response failure | Local Sandbox FAIL → PASS saved; not a real PayPal duplicate-invoice response |
-| F5 · tax rounding | Shop calculates a total from subtotal and tax rate | Local Sandbox FAIL → PASS on fresh orders |
-| F6 · webhook replay | Same capture event sent twice to shop | Local Sandbox FAIL → PASS; one PayPal capture in both runs |
-| F7 · prompt injection | Buyer message asks shop assistant for an excessive refund | Local Sandbox FAIL → PASS; refund behavior is shop-side only |
+| **F1 · lost capture response** | Lets PayPal capture (`201`), then drops the reply at mitmproxy (`504`); catches unfulfilled paid orders when a blind retry hits `422` (`1` PayPal capture vs `0` in shop) | Local Sandbox FAIL → PASS saved |
+| **F2 · simulated gateway timeout** | Delays the first order-create response (`1s`) and injects `HTTP 504`; catches duplicate Sandbox orders created when retries omit `PayPal-Request-Id` | Local Sandbox FAIL → PASS saved |
+| **F3 · declined instrument** | Forces `422 INSTRUMENT_DECLINED` on capture; catches false-fulfillment bugs where the shop logs a completed capture despite `$0.00` collected | Local Sandbox FAIL → PASS saved |
+| **F4 · invoice response fault** | Injects a simulated `409 DUPLICATE_INVOICE_ID` when invoice IDs collide or vary across retries; verifies deterministic cart-hashed invoice identity and single capture | Local Sandbox FAIL → PASS saved; simulated proxy fault, not real PayPal duplicate-invoice rejection |
+| **F5 · tax rounding** | Catches floating-point cent truncation in checkout tax calculation (`$38.92` captured vs `$38.96` expected) by comparing PayPal's ledger against decimal math | Local Sandbox FAIL → PASS on fresh orders |
+| **F6 · webhook replay** | Replays the same `PAYMENT.CAPTURE.COMPLETED` webhook twice to verify idempotent deduplication (`1` processed delivery vs `2`; PayPal stays at `1` capture) | Local Sandbox FAIL → PASS; single PayPal capture in both runs |
+| **F7 · prompt injection** | Sends an adversarial buyer chat prompt asking for an unapproved `$500.00` refund; checks that deterministic role + `$15.00` code guardrails reject it | Local Sandbox FAIL → PASS; shop-side guard only, no PayPal Refund API call |
 
 ## How we used the tools
 
