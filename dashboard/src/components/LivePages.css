@@ -723,6 +723,14 @@
   pointer-events: none;
 }
 
+.s02-proof-before {
+  background: #1e2631;
+}
+
+.s02-proof-after {
+  clip-path: inset(0 0 0 var(--split));
+}
+
 .s02-proof-side.is-bad {
   background: repeating-linear-gradient(135deg, #3a0b0b 0 28px, #2f0909 28px 56px) 0 0 / 79.196px 79.196px;
   animation: s02-proof-drift 6s linear infinite;
@@ -730,13 +738,15 @@
 
 .s02-proof-side.is-good {
   background: radial-gradient(circle at 70% 30%, #17b765 0%, #08753d 72%);
-  clip-path: inset(0 0 0 var(--split));
 }
 
 .s02-proof-side.is-pending {
   color: #fff;
   background: #28313d;
-  clip-path: inset(0 0 0 var(--split));
+}
+
+.s02-proof-before.is-pending {
+  background: #1e2631;
 }
 
 .s02-proof-side > span {
@@ -746,8 +756,7 @@
   opacity: .9;
 }
 
-.s02-proof-side.is-good > span,
-.s02-proof-side.is-pending > span {
+.s02-proof-after > span {
   justify-self: end;
 }
 

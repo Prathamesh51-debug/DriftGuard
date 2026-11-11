@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FixState, Run } from '../types'
 import { faultLabel, shortId, timeAgo } from '../format'
 import { FAULT_CATALOG } from '../faultCatalog'
@@ -436,6 +436,10 @@ export function RunDetailPage({
   )
 }
 
+function isRevealedPass(run?: Run): boolean {
+  return run?.result?.verdict === 'PASS' && (run.mode === 'sample' || Boolean(run.fix?.patch_sha256))
+}
+
 function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
   const [pop, setPop] = useState(false)
   const proofRef = useRef<HTMLDivElement>(null)
@@ -447,17 +451,24 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const appCount = run.result.observed.app_recorded_captures
     return `${run.mode === 'sample' ? 'Sample: PayPal' : 'PayPal'} ${run.result.observed.captures} capture${run.result.observed.captures === 1 ? '' : 's'}. ${run.mode === 'sample' ? 'App state' : 'Your app'} ${appCount == null ? 'has no reading' : `${appCount} capture${appCount === 1 ? '' : 's'}`}.`
   }
-  const toneClass = (run?: Run) => run?.mode === 'sample'
-    ? 'is-pending'
-    : run?.result?.verdict === 'PASS' && run.fix?.patch_sha256
-    ? 'is-good'
-    : run?.result?.verdict
-      ? 'is-bad'
-      : 'is-pending'
+  const toneClass = (run?: Run) => {
+    const verdict = run?.result?.verdict
+    if (!verdict) return 'is-pending'
+    if (verdict === 'PASS') return isRevealedPass(run) ? 'is-good' : 'is-pending'
+    return 'is-bad'
+  }
+  const afterRevealedPass = isRevealedPass(after)
+  const afterLiveVerified = after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && Boolean(after.fix?.patch_sha256)
 
   useEffect(() => {
     const proof = proofRef.current
-    if (!proof || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    if (!proof) return
+    const endAt = afterRevealedPass ? 20 : 80
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      splitRef.current = endAt
+      proof.style.setProperty('--split', `${endAt}%`)
+      return
+    }
 
     let cancelled = false
     let started = false
@@ -468,7 +479,7 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     const setPosition = (value: number) => {
       splitRef.current = value
       proof.style.setProperty('--split', `${value}%`)
-      if (value < 40 && !seen && after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) {
+      if (value < 40 && !seen && afterLiveVerified) {
         seen = true
         setPop(true)
         if (popTimer != null) window.clearTimeout(popTimer)
@@ -493,7 +504,6 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
     }
     const demo = () => {
       if (cancelled || !autoRef.current) return
-      const endAt = after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after?.fix?.patch_sha256 ? 20 : 80
       const stops = [splitRef.current, 92, 8, endAt]
       let leg = 0
       const next = () => {
@@ -522,27 +532,27 @@ function ComparisonProof({ before, after }: { before: Run; after?: Run }) {
       if (popTimer != null) window.clearTimeout(popTimer)
       window.cancelAnimationFrame(frame)
     }
-  }, [after?.mode, after?.result?.verdict, after?.fix?.patch_sha256])
+  }, [afterRevealedPass, afterLiveVerified])
 
   const handleSplit = (value: number) => {
     autoRef.current = false
     splitRef.current = value
     proofRef.current?.style.setProperty('--split', `${value}%`)
-    if (value < 40 && after?.mode !== 'sample' && after?.result?.verdict === 'PASS' && after.fix?.patch_sha256) setPop(true)
+    if (value < 40 && afterLiveVerified) setPop(true)
     else setPop(false)
   }
 
   return (
     <section className="s02-comparison">
       <h2>Before and after</h2>
-      <div ref={proofRef} className={`s02-proof${pop ? ' is-pop' : ''}`} style={{ '--split': '80%' } as CSSProperties}>
-        <div className={`s02-proof-side ${toneClass(before)}`}>
-          <span>Original run</span>
+      <div ref={proofRef} className={`s02-proof${pop ? ' is-pop' : ''}`}>
+        <div className={`s02-proof-side s02-proof-before ${toneClass(before)}`}>
+          <span>{before.mode === 'sample' ? 'Sample original' : 'Original run'}</span>
           <strong>{before.result?.verdict ?? 'RUNNING'}</strong>
           <p>{resultText(before)}</p>
         </div>
-        <div className={`s02-proof-side ${toneClass(after)}`}>
-          <span>Repeat run</span>
+        <div className={`s02-proof-side s02-proof-after ${toneClass(after)}`}>
+          <span>{(after?.mode ?? before.mode) === 'sample' ? 'Sample repeat' : 'Repeat run'}</span>
           <strong>{after?.result?.verdict ?? (after ? 'RUNNING' : 'NOT RUN')}</strong>
           <p>{after ? resultText(after) : before.mode === 'sample' ? 'Show the prepared PASS fixture to compare sample results.' : 'Generate and verify a fix to compare results.'}</p>
         </div>
