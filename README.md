@@ -53,11 +53,20 @@ The reconciler decides PASS, FAIL, or ERROR from observed state. The model can s
 
 ## Run it locally
 
-The hosted site is a fixture explorer. For a real Sandbox checkout, use the local setup below. You need Python, Node.js/npm, Docker Desktop, PayPal Sandbox REST credentials, and a Sandbox buyer account. Playwright needs its Chromium browser installed.
+The hosted site is a fixture explorer. For a real Sandbox checkout, use the full local setup below. If you just want to browse the dashboard UI without Docker or PayPal credentials, jump to [Quick local UI preview](#quick-local-ui-preview-mock-fixtures).
 
-Copy `.env.example` to `.env`; fill in `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_SANDBOX_BUYER_EMAIL`, and `PAYPAL_SANDBOX_BUYER_PASSWORD`. Keep that file on your machine.
+### Prerequisites
 
-From the repository root, install the dependencies and start the proxy/database containers:
+* **Python 3.11+**, **Node.js 20.19+ or 22.12+ / npm** (`22.12+` for running dashboard tests), and **Git** on `PATH` (used to check and apply candidate diffs)
+* **Docker Desktop** (runs PostgreSQL 16 and mitmproxy 10.2)
+* **PayPal Developer Sandbox** REST credentials (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`) and a Sandbox personal buyer account (`PAYPAL_SANDBOX_BUYER_EMAIL`, `PAYPAL_SANDBOX_BUYER_PASSWORD`)
+* *(Optional)* `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY` / `GROQ_API_KEY`) for AI Studio replies and model-generated fixes; local run execution and curated-patch verification do not require a model key
+
+### Full Sandbox setup
+
+1. Copy `.env.example` to `.env` (`Copy-Item .env.example .env` in PowerShell or `cp .env.example .env` in bash) and fill in your PayPal Sandbox REST credentials and Sandbox buyer account. Keep `.env` only on your machine.
+
+2. From the repository root, install dependencies, download Playwright's Chromium browser, and start PostgreSQL + mitmproxy:
 
 ```powershell
 python -m pip install -r engine/requirements.txt
@@ -68,7 +77,7 @@ npm install --prefix dashboard
 docker compose up -d
 ```
 
-Start these four processes in separate terminals:
+3. Start these four processes in separate terminals:
 
 ```powershell
 python -m uvicorn engine.api.main:app --port 8000 --reload
@@ -86,7 +95,7 @@ python -m cli report --all
 
 The first command returns a nonzero exit code when the seeded bug is found: `1` means FAIL and `2` means ERROR or no verdict. PostgreSQL is used when available; the API reports a persistent SQLite fallback if it cannot connect. The active proxy fault is shared, so run scenarios one at a time.
 
-The Studio service on port 8001 needs `ANTHROPIC_API_KEY` for Claude replies. Without a model key, Studio can show prepared preview answers; local run execution and reconciliation do not need a model key. The dashboard reads `VITE_API_URL` and `VITE_AI_URL` from `dashboard/.env.local` when you use non-default addresses. Never put PayPal or model secrets in `VITE_` variables.
+The Studio service on port 8001 needs `ANTHROPIC_API_KEY` for Claude replies (without it, Studio returns HTTP 503, while local run execution, curated fixes with `DRIFTGUARD_LLM=none`, and reconciliation still work). The dashboard reads `VITE_API_URL` and `VITE_AI_URL` from `dashboard/.env.local` when you use non-default addresses. Never put PayPal or model secrets in `VITE_` variables.
 
 ### Verify a patch locally
 
@@ -98,6 +107,28 @@ DRIFTGUARD_LLM=none
 ```
 
 Restart the engine, open a failed run, and choose **Generate and verify fix**. With `DRIFTGUARD_LLM=none`, the fixer selects a curated patch. The engine applies it to a disposable copy, builds that copy, and tests a new Sandbox order. Keep this option off on public services; the temporary directory is not a security sandbox.
+
+### Quick local UI preview (mock fixtures)
+
+To inspect the dashboard locally without Docker or PayPal Sandbox credentials (Python 3.11+ and Node.js 20.19+ / 22+ only):
+
+1. Start `mock_runner` in Terminal 1:
+   ```powershell
+   python -m pip install -r mock_runner/requirements.txt
+   python -m uvicorn mock_runner.app:app --port 8000
+   ```
+2. Point the dashboard's AI/fix endpoints at `mock_runner` by adding these two non-secret lines to `dashboard/.env.local`:
+   ```dotenv
+   VITE_AI_URL=http://localhost:8000
+   VITE_DEMO_MODE=sample
+   ```
+3. Start the dashboard in Terminal 2:
+   ```powershell
+   npm install --prefix dashboard
+   npm --prefix dashboard run dev
+   ```
+
+Open `http://localhost:5173/` to explore the F1–F7 fixtures locally. Remove `dashboard/.env.local` before switching back to the full 4-terminal Sandbox setup.
 
 ## Hosted explorer
 
