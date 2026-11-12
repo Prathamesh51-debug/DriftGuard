@@ -11,7 +11,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const listRuns = (): Promise<Run[]> => request<Run[]>('/runs')
-export const launchRun = (): Promise<Run> => request<Run>('/runs', { method: 'POST' })
+export const launchRun = (fault?: string): Promise<Run> =>
+  request<Run>('/runs', {
+    method: 'POST',
+    ...(fault
+      ? {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fault }),
+        }
+      : {}),
+  })
 export const rerunRun = (runId: string): Promise<Run> =>
   request<Run>(`/runs/${runId}/rerun`, { method: 'POST' })
 export const verifyFixRun = (runId: string): Promise<Run> =>

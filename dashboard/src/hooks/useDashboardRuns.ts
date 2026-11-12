@@ -89,7 +89,7 @@ export function useDashboardRuns() {
     }
   }, [refresh])
 
-  const launch = useCallback(() => runAction(launchRun), [runAction])
+  const launch = useCallback((fault?: string) => runAction(() => launchRun(fault)), [runAction])
   const rerun = useCallback((runId: string) => runAction(() => rerunRun(runId)), [runAction])
   const verify = useCallback((runId: string) => runAction(() => verifyFixRun(runId)), [runAction])
 

@@ -486,6 +486,13 @@
   background: var(--panel-2);
 }
 
+.s02-fault-run-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .s02-run-view {
   height: 100%;
   display: flex;

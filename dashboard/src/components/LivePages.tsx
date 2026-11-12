@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FixState, Run } from '../types'
 import { faultLabel, shortId, timeAgo } from '../format'
 import { FAULT_CATALOG } from '../faultCatalog'
+import { launchRun } from '../api'
 import { VerdictChip } from './VerdictChip'
 import { FixPanel } from './FixPanel'
 
@@ -11,6 +12,8 @@ type PageProps = {
   offline: boolean
   selectedId: string | null
   onSelect: (runId: string, opener?: HTMLElement) => void
+  onLaunchFault?: (fault: string) => Promise<unknown> | void
+  busy?: boolean
 }
 
 function sortedRuns(runs: Run[]): Run[] {
@@ -231,8 +234,25 @@ export function RunsPage(props: PageProps) {
   )
 }
 
-export function FaultsPage({ runs, loading, offline }: PageProps) {
+export function FaultsPage({ runs, loading, offline, onLaunchFault, busy }: PageProps) {
   const orderedRuns = sortedRuns(runs)
+  const [launchingFault, setLaunchingFault] = useState<string | null>(null)
+
+  const handleLaunch = async (faultCode: string) => {
+    try {
+      setLaunchingFault(faultCode)
+      if (onLaunchFault) {
+        await onLaunchFault(faultCode)
+        return
+      }
+      const newRun = await launchRun(faultCode)
+      window.location.assign(`/live/runs/${encodeURIComponent(newRun.run_id)}`)
+    } catch {
+      // Handled or ignored
+    } finally {
+      setLaunchingFault(null)
+    }
+  }
 
   return (
     <section className="s02-view">
@@ -256,15 +276,18 @@ export function FaultsPage({ runs, loading, offline }: PageProps) {
               <th scope="col">What it does</th>
               <th scope="col">Runs</th>
               <th scope="col">Latest</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
             {FAULT_CATALOG.map((fault) => {
               const faultRuns = orderedRuns.filter((run) => run.scenario.fault === fault.code)
               const latest = faultRuns[0]
+              const faultShort = fault.code.split('_')[0]
+              const isLaunching = launchingFault === fault.code
               return (
                 <tr key={fault.code}>
-                  <td className="mono"><b>{fault.code.split('_')[0]}</b></td>
+                  <td className="mono"><b>{faultShort}</b></td>
                   <td>{fault.name}</td>
                   <td className="s02-fault-description">{fault.description}</td>
                   <td className="s02-numeric">{faultRuns.length}</td>
@@ -274,6 +297,17 @@ export function FaultsPage({ runs, loading, offline }: PageProps) {
                       : latest
                         ? <span className="muted">Running</span>
                         : <span className="muted">{loading ? 'Loading' : 'Not run yet'}</span>}
+                  </td>
+                  <td>
+                    <button
+                      className="btn s02-fault-run-btn"
+                      type="button"
+                      disabled={busy || offline || isLaunching}
+                      onClick={() => void handleLaunch(fault.code)}
+                      title={`Run scenario for ${faultShort}`}
+                    >
+                      {isLaunching ? 'Starting…' : `Run ${faultShort}`}
+                    </button>
                   </td>
                 </tr>
               )

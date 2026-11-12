@@ -167,7 +167,15 @@ export default function LiveDashboard({ view, runId }: { view: LiveView; runId: 
         ) : view === 'overview' ? (
           <OverviewPage runs={runs} loading={!loaded} offline={offline} selectedId={selectedId} onSelect={openEvidence} />
         ) : view === 'faults' ? (
-          <FaultsPage runs={runs} loading={!loaded} offline={offline} selectedId={selectedId} onSelect={openEvidence} />
+          <FaultsPage
+            runs={runs}
+            loading={!loaded}
+            offline={offline}
+            selectedId={selectedId}
+            onSelect={openEvidence}
+            onLaunchFault={(fault) => runActionAndOpen(() => launch(fault))}
+            busy={busy}
+          />
         ) : view === 'docs' ? (
           <DocsPage />
         ) : view === 'run' ? (
