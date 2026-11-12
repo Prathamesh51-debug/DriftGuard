@@ -451,7 +451,13 @@ def reconcile_order(
             replay_event_id = f"{base_event_id}-{order_id}"
             webhook_ids = [event_id for event_id in all_webhook_ids if event_id == replay_event_id]
         else:
-            webhook_ids = [event_id for event_id in all_webhook_ids if order_id and order_id in event_id]
+            # Synthetic F6 replays are scoped to specific orders (-<order_id>),
+            # whereas real PayPal webhook event IDs (UUIDs or PayPal IDs) must
+            # not be dropped just because they don't contain order_id.
+            webhook_ids = [
+                event_id for event_id in all_webhook_ids
+                if (order_id and order_id in event_id) or ("WH-REPLAY" not in event_id)
+            ]
 
     evidence = Evidence(
         paypal_order_ids=created_orders,

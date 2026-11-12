@@ -136,3 +136,25 @@ def test_non_f6_evidence_ignores_stale_webhooks_from_other_orders(monkeypatch, t
     assert result.verdict == Verdict.FAIL
     assert result.evidence.webhook_event_ids == []
 
+
+def test_non_f6_evidence_preserves_real_paypal_webhook_event_ids(monkeypatch, tmp_path):
+    scenario = Scenario.model_validate_json((FIXTURES / "f1_scenario.json").read_text())
+    ledger = {"captures": [{"id": "capture-1"}], "capture_ids": ["capture-1"],
+              "refunds": [], "refund_ids": [], "total_captured_amount": "38.97"}
+    client = SimpleNamespace(get_order=lambda _id: {}, parse_order_ledger=lambda _raw: ledger)
+    monkeypatch.setattr(module, "fetch_app_state", lambda _url: {
+        "orders": [{"orderId": "current", "captureCount": 1}],
+        "webhookEventsProcessed": [
+            "WH-REPLAY-998877-older",
+            "8TR36254P9283745T",
+            "c4b12345-6789-4def-9123-abcdef012345",
+        ],
+    })
+    result = module.reconcile_order(scenario, "current", client=client,
+                                    log_path=tmp_path / "empty-audit.jsonl")
+    assert result.evidence.webhook_event_ids == [
+        "8TR36254P9283745T",
+        "c4b12345-6789-4def-9123-abcdef012345",
+    ]
+
+
