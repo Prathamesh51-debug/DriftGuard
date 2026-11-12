@@ -191,15 +191,21 @@ def get_run(run_id: str) -> Run:
     r = db.get_run(run_id)
     if not r:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-    return Run(
-        run_id=r["run_id"],
-        status=r["status"],
-        created_at=r["created_at"],
-        scenario=Scenario.model_validate(r["scenario"]),
-        result=Result.model_validate(r["result"]) if r.get("result") else None,
-        rerun_of=r.get("rerun_of"),
-        fix=r.get("fix"),
-    )
+    try:
+        return Run(
+            run_id=r["run_id"],
+            status=r["status"],
+            created_at=r["created_at"],
+            scenario=Scenario.model_validate(r["scenario"]),
+            result=Result.model_validate(r["result"]) if r.get("result") else None,
+            rerun_of=r.get("rerun_of"),
+            fix=r.get("fix"),
+        )
+    except (ValidationError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Run {run_id} contains malformed or incompatible legacy data: {exc}",
+        )
 
 
 @app.post("/runs/{run_id}/rerun", response_model=Run, status_code=201)
@@ -214,8 +220,14 @@ def rerun(run_id: str, background_tasks: BackgroundTasks) -> Run:
             detail=f"Run {run_id} is still running; wait for it to finish before rerunning."
         )
 
+    try:
+        scenario = Scenario.model_validate(parent["scenario"])
+    except (ValidationError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Run {run_id} contains malformed or incompatible legacy data: {exc}",
+        )
     new_run_id = f"run_{uuid.uuid4().hex[:8]}"
-    scenario = Scenario.model_validate(parent["scenario"])
     db_run = db.create_run(new_run_id, scenario.model_dump(), rerun_of=run_id)
 
     background_tasks.add_task(_execute_run, new_run_id, scenario)
@@ -240,10 +252,16 @@ def verify_fix(run_id: str, background_tasks: BackgroundTasks) -> Run:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
     if parent["status"] == "running":
         raise HTTPException(status_code=409, detail="Wait for the run to finish")
-    failing = Result.model_validate(parent["result"]) if parent.get("result") else None
+    try:
+        failing = Result.model_validate(parent["result"]) if parent.get("result") else None
+        scenario = Scenario.model_validate(parent["scenario"])
+    except (ValidationError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Run {run_id} contains malformed or incompatible legacy data: {exc}",
+        )
     if failing is None or failing.verdict != Verdict.FAIL:
         raise HTTPException(status_code=422, detail="Only failed runs can be fixed and verified")
-    scenario = Scenario.model_validate(parent["scenario"])
     new_run_id = f"run_{uuid.uuid4().hex[:8]}"
     created = db.create_run(new_run_id, scenario.model_dump(), rerun_of=run_id)
     background_tasks.add_task(_execute_verified_run, new_run_id, scenario, failing)

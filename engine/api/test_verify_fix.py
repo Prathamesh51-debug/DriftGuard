@@ -69,3 +69,26 @@ def test_both_local_frontend_hostnames_can_read_the_api(tmp_path, monkeypatch):
             })
             assert response.status_code == 200
             assert response.headers["access-control-allow-origin"] == origin
+
+
+def test_get_run_handles_malformed_legacy_data_safely(tmp_path, monkeypatch):
+    monkeypatch.setattr(database, "SQLITE_DB_PATH", tmp_path / "runs.db")
+    monkeypatch.setattr(database.db, "use_postgres", False)
+    database.db.init_db()
+
+    with sqlite3.connect(tmp_path / "runs.db") as conn:
+        conn.execute(
+            "INSERT INTO runs (run_id, status, created_at, scenario_json, result_json) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("run_corrupt", "complete", 123.0, '{"invalid": "schema"}', None),
+        )
+
+    with TestClient(main.app) as client:
+        res = client.get("/runs/run_corrupt")
+        assert res.status_code == 404
+        assert "malformed" in res.json()["detail"].lower()
+
+        res_rerun = client.post("/runs/run_corrupt/rerun")
+        assert res_rerun.status_code == 404
+        assert "malformed" in res_rerun.json()["detail"].lower()
+
