@@ -50,4 +50,51 @@ describe('launchRun', () => {
     expect(JSON.parse(capturedInit?.body as string)).toEqual({ fault: 'F2_SLOW_PAYPAL' })
     expect(run.run_id).toBe('run_456')
   })
+
+  it('surfaces detail from response JSON when request fails with 4xx/5xx', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ detail: "Unknown fault 'UNKNOWN'" }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    await expect(launchRun('UNKNOWN')).rejects.toThrow("Unknown fault 'UNKNOWN'")
+  })
+
+  it('surfaces validation error messages from array detail', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({ detail: [{ loc: ['body', 'fault'], msg: 'Invalid fault format' }] }),
+        {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
+    })
+
+    await expect(launchRun('BAD')).rejects.toThrow('Invalid fault format')
+  })
+
+  it('surfaces message or object when detail is an object or absent', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ message: 'Service unavailable' }), {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    await expect(launchRun()).rejects.toThrow('Service unavailable')
+  })
+
+  it('falls back to generic error when response is not JSON', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      return new Response('Internal Server Error', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    })
+
+    await expect(launchRun()).rejects.toThrow('POST /runs failed (500)')
+  })
 })

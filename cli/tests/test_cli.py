@@ -177,6 +177,16 @@ def test_a_reply_that_breaks_the_contract_is_reported_not_crashed(capsys):
     assert "does not match the contract" in capsys.readouterr().err
 
 
+def test_engine_preserves_error_detail_on_http_failure():
+    from cli.client import EngineError
+
+    s = FakeSession({("POST", "/runs"): (422, {"detail": "Unknown fault 'FOO'. Valid values: ['F1']"})})
+    engine = Engine("http://engine.test", s)
+    with pytest.raises(EngineError, match="Unknown fault 'FOO'"):
+        engine.launch("FOO")
+
+
+
 # --- against the real mock runner over HTTP -------------------------------------------------
 
 @pytest.fixture

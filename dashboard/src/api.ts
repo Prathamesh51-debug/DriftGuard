@@ -6,7 +6,30 @@ export const AI_URL: string = import.meta.env.VITE_AI_URL ?? 'http://localhost:8
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, init)
-  if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path} failed (${res.status})`)
+  if (!res.ok) {
+    let message = `${init?.method ?? 'GET'} ${path} failed (${res.status})`
+    try {
+      const body = (await res.json()) as { detail?: unknown; message?: unknown; error?: unknown }
+      if (typeof body.detail === 'string') {
+        message = body.detail
+      } else if (Array.isArray(body.detail)) {
+        message = body.detail
+          .map((d: unknown) =>
+            typeof d === 'object' && d !== null && 'msg' in d ? String((d as { msg: unknown }).msg) : String(d),
+          )
+          .join('; ')
+      } else if (body.detail) {
+        message = typeof body.detail === 'object' ? JSON.stringify(body.detail) : String(body.detail)
+      } else if (typeof body.message === 'string') {
+        message = body.message
+      } else if (typeof body.error === 'string') {
+        message = body.error
+      }
+    } catch {
+      /* keep the generic message */
+    }
+    throw new Error(message)
+  }
   return res.json() as Promise<T>
 }
 

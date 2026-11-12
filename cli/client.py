@@ -38,9 +38,30 @@ class Engine:
                 f"Can't reach the engine at {self.base_url} ({type(exc).__name__}). "
                 "Start it with `make api` (and the demo shop with `make demo`), or set ENGINE_BASE_URL."
             ) from exc
-        if resp.status_code == 404:
-            raise EngineError(f"The engine has no {path} (HTTP 404).")
         if resp.status_code >= 400:
+            detail = None
+            try:
+                data = resp.json()
+                if isinstance(data, dict) and "detail" in data:
+                    raw_detail = data["detail"]
+                    if isinstance(raw_detail, str):
+                        detail = raw_detail
+                    elif isinstance(raw_detail, list):
+                        detail = "; ".join(
+                            f"{': '.join(str(loc) for loc in err.get('loc', []))}: {err.get('msg')}"
+                            if isinstance(err, dict)
+                            else str(err)
+                            for err in raw_detail
+                        )
+                    elif raw_detail is not None:
+                        detail = str(raw_detail)
+            except Exception:
+                pass
+
+            if detail:
+                raise EngineError(f"The engine answered {method} {path} with HTTP {resp.status_code}: {detail}")
+            if resp.status_code == 404:
+                raise EngineError(f"The engine has no {path} (HTTP 404).")
             raise EngineError(f"The engine answered {method} {path} with HTTP {resp.status_code}.")
         try:
             return resp.json()
