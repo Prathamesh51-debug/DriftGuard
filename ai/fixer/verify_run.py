@@ -35,6 +35,13 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _safe_link(src, dst, *args, **kwargs):
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst, *args, **kwargs)
+
+
 def _stop_tree(process: subprocess.Popen) -> None:
     if process.poll() is not None:
         return
@@ -75,7 +82,7 @@ def generate_and_verify(
         source_modules = SHOP / "node_modules"
         if not source_modules.is_dir():
             raise RuntimeError("Demo shop dependencies missing: npm install --prefix targets/demo-shop")
-        shutil.copytree(source_modules, copy / "node_modules", copy_function=os.link)
+        shutil.copytree(source_modules, copy / "node_modules", copy_function=_safe_link)
         node = shutil.which("node")
         if not node:
             raise RuntimeError("Node.js is required to build the patched shop")

@@ -218,3 +218,21 @@ def test_bug_09_guidance_prevents_duplicate_effects_across_checkout_and_webhook(
     assert "shopState.hasWebhookEvent(event.id)" in notes
     assert "captureCount" in notes
 
+
+def test_safe_link_falls_back_to_copy2_on_os_error(tmp_path, monkeypatch):
+    import os
+    from ai.fixer.verify_run import _safe_link
+
+    src = tmp_path / "source.txt"
+    dst = tmp_path / "dest.txt"
+    src.write_text("driftguard-payload", encoding="utf-8")
+
+    def failing_link(_s, _d):
+        raise OSError(17, "Cross-device link or WinError 17")
+
+    monkeypatch.setattr(os, "link", failing_link)
+    _safe_link(str(src), str(dst))
+    assert dst.exists()
+    assert dst.read_text(encoding="utf-8") == "driftguard-payload"
+
+
