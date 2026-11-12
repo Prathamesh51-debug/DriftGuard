@@ -313,7 +313,10 @@ def llm_messages(req: dict, request: Request) -> dict:
             raise HTTPException(413, "Studio requires 1–24 messages")
         if not isinstance(tools, list) or len(tools) > 20 or len(json.dumps(req)) > 40_000:
             raise HTTPException(413, "Studio request is too large")
-        client_ip = request.client.host if request.client else "unknown"
+        forwarded_for = request.headers.get("x-forwarded-for")
+        client_ip = forwarded_for.split(",")[0].strip() if forwarded_for else None
+        if not client_ip:
+            client_ip = request.client.host if (request.client and request.client.host) else "unknown"
         global _ai_calls_total
         with _ai_lock:
             recent = _ai_calls_by_ip[client_ip]
@@ -343,6 +346,7 @@ def llm_messages(req: dict, request: Request) -> dict:
                         "x-api-key": api_key,
                         "anthropic-version": "2023-06-01",
                         "content-type": "application/json",
+                        "Accept-Encoding": "gzip, deflate",
                     },
                     json=payload,
                 )

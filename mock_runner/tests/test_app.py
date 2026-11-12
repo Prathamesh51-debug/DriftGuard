@@ -155,3 +155,71 @@ def test_paid_route_stops_at_process_call_limit(client, monkeypatch):
     monkeypatch.setattr(mock_app, "_ai_calls_total", mock_app.MAX_AI_CALLS_PER_PROCESS)
     response = client.post("/llm/messages", json={"messages": [{"role": "user", "content": "F1?"}]})
     assert response.status_code == 429
+
+
+def test_paid_route_accept_encoding_header_and_x_forwarded_for_rate_limit(client, monkeypatch):
+    import httpx
+
+    captured_headers = {}
+
+    class FakeClient:
+        def __init__(self, **_):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            pass
+
+        def post(self, *_args, **kwargs):
+            captured_headers.update(kwargs.get("headers", {}))
+            return type("Reply", (), {"status_code": 200, "json": lambda self: {
+                "id": "msg_ok", "content": [{"type": "text", "text": "ok"}],
+            }})()
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-only")
+    monkeypatch.setenv("DRIFTGUARD_PUBLIC_AI_ENABLED", "1")
+    monkeypatch.setattr(mock_app, "_ai_calls_total", 0)
+    mock_app._ai_calls_by_ip.clear()
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+
+    # First request from 203.0.113.195 via X-Forwarded-For
+    res = client.post(
+        "/llm/messages",
+        headers={"x-forwarded-for": "203.0.113.195, 10.0.0.1"},
+        json={"messages": [{"role": "user", "content": "F1?"}]},
+    )
+    assert res.status_code == 200
+    assert captured_headers.get("Accept-Encoding") == "gzip, deflate"
+    assert "203.0.113.195" in mock_app._ai_calls_by_ip
+    assert len(mock_app._ai_calls_by_ip["203.0.113.195"]) == 1
+
+    # Simulate reaching IP limit
+    for _ in range(mock_app.MAX_AI_CALLS_PER_IP_HOUR - 1):
+        mock_app._ai_calls_by_ip["203.0.113.195"].append(time.monotonic())
+
+    blocked = client.post(
+        "/llm/messages",
+        headers={"x-forwarded-for": "203.0.113.195"},
+        json={"messages": [{"role": "user", "content": "F1?"}]},
+    )
+    assert blocked.status_code == 429
+
+    # Another IP still works
+    allowed = client.post(
+        "/llm/messages",
+        headers={"x-forwarded-for": "198.51.100.42"},
+        json={"messages": [{"role": "user", "content": "F1?"}]},
+    )
+    assert allowed.status_code == 200
+
+    # Empty or whitespace x-forwarded-for falls back safely without creating empty string key
+    empty_fwd = client.post(
+        "/llm/messages",
+        headers={"x-forwarded-for": "   "},
+        json={"messages": [{"role": "user", "content": "F1?"}]},
+    )
+    assert empty_fwd.status_code == 200
+    assert "" not in mock_app._ai_calls_by_ip
+
