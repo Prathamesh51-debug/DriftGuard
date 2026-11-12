@@ -63,12 +63,30 @@ def approve_order(
         )
         try:
             page.goto(approve_url, wait_until="domcontentloaded")
+            # Dismiss cookie banner if present
+            try:
+                cookie_banner = page.locator(sel.COOKIE_BANNER).first
+                if cookie_banner.is_visible():
+                    cookie_banner.click()
+            except PlaywrightError:
+                pass
+
             page.locator(sel.EMAIL).fill(email)
             # Email and password share one page in some flows, two pages in others.
             if page.locator(sel.NEXT).is_visible():
                 page.locator(sel.NEXT).click()
+                page.locator(sel.PASSWORD).wait_for(state="visible")
             page.locator(sel.PASSWORD).fill(password)
             page.locator(sel.LOGIN).click()
+
+            # Dismiss cookie banner if shown on the review step
+            try:
+                cookie_banner = page.locator(sel.COOKIE_BANNER).first
+                if cookie_banner.is_visible():
+                    cookie_banner.click()
+            except PlaywrightError:
+                pass
+
             submit = page.locator(sel.SUBMIT).first
             submit.wait_for()
             with page.expect_request(lambda r: r.url.startswith(return_url)) as redirect:
