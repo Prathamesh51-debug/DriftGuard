@@ -1,20 +1,21 @@
-# DriftGuard · submission copy
+# DriftGuard · Devpost submission copy
 
 **Repository:** https://github.com/Prathamesh51-debug/DriftGuard
 **Hosted explorer:** https://driftguard-dashboard.onrender.com
 **Team:** Swastik Bose, Kiran Patra, Prathamesh Prasad
 
-## What we built
+## Inspiration
 
-A checkout request can reach PayPal even when its response never reaches the merchant. That leaves the merchant with a hard question: did the buyer pay, or should the app try again? A blind retry can create another payment. A blind failure can leave a paid order unfulfilled.
+In online checkouts, an API response and real money movement are two different facts. A capture call can reach PayPal and settle funds while the HTTP reply disappears on the way back due to a gateway timeout or proxy drop. That leaves the merchant's backend guessing: retry blindly and risk creating a duplicate payment, or fail the checkout and leave a paying customer with an unfulfilled order.
 
-DriftGuard makes that uncertainty testable. We built a TypeScript demo shop with deliberate payment bugs, a mitmproxy fault injector, a Playwright Sandbox buyer, a runner, and a reconciler. The runner creates a PayPal Sandbox order and triggers a fault. The reconciler reads PayPal order evidence and the shop's state, then produces a deterministic PASS, FAIL, or ERROR. The React dashboard makes the mismatch visible. A patch verifier can apply a proposed fix to a temporary copy of the shop, build it, and run a **new** Sandbox checkout.
+Most test suites rely on happy-path mocks that never catch this mismatch until production ledgers go out of sync. We built **DriftGuard** to make silent payment state drift testable, visible, and deterministically verifiable against real PayPal Sandbox transactions.
 
-Our most useful lesson was that a successful API response and a successful payment are different facts. For F1, the shop lost the capture response while PayPal held a capture. The first run showed PayPal with one capture and the shop with none. After a curated patch, a fresh order showed one capture on both sides. The same local patch-and-rerun flow passed once each across all seven faults (F1–F7), using a fresh PayPal Sandbox order per rerun. [Saved run IDs, patch hashes, and limitations](../evals/fixer/results/live-fixer-eval.md) are in the repository.
+## What it does
 
-## What the demo shows
+DriftGuard is a checkout reliability and fault-verification harness built around a four-step loop (**Create → Disrupt → Compare → Rerun**):
 
-The **hosted Render site is an interactive explorer of recorded examples**. It uses a fixture-backed API so a judge can browse the interface without Sandbox accounts or Docker. Hosted launch, fix, and verify actions present prepared sample outcomes; they do not make PayPal calls or execute patched code. Studio can optionally call Anthropic from the server when a key is configured; otherwise its answer is labeled as prepared. For live fault injection, run the repository locally using the [README](../README.md), or inspect the saved F1–F7 evidence in the [evaluation report](../evals/fixer/results/live-fixer-eval.md).
+1. **Create:** A headless Playwright buyer navigates and approves a real PayPal Sandbox order against a deliberately vulnerable TypeScript demo shop.
+2. **Disrupt:** `mitmproxy` intercepts live checkout traffic and injects **7 real-world failure modes (F1–F7)**:
 
 | Scenario | How DriftGuard breaks & checks it | Evidence status |
 |---|---|---|
@@ -24,25 +25,47 @@ The **hosted Render site is an interactive explorer of recorded examples**. It u
 | **F4 · invoice response fault** | Injects a simulated `409 DUPLICATE_INVOICE_ID` when invoice IDs collide or vary across retries; verifies deterministic cart-hashed invoice identity and single capture | Local Sandbox FAIL → PASS saved; simulated proxy fault, not real PayPal duplicate-invoice rejection |
 | **F5 · tax rounding** | Catches floating-point cent truncation in checkout tax calculation (`$38.92` captured vs `$38.96` expected) by comparing PayPal's ledger against decimal math | Local Sandbox FAIL → PASS on fresh orders |
 | **F6 · webhook replay** | Replays the same `PAYMENT.CAPTURE.COMPLETED` webhook twice to verify idempotent deduplication (`1` processed delivery vs `2`; PayPal stays at `1` capture) | Local Sandbox FAIL → PASS; single PayPal capture in both runs |
-| **F7 · prompt injection** | Sends an adversarial buyer chat prompt asking for an unapproved `$500.00` refund; checks that deterministic role + `$15.00` code guardrails reject it | Local Sandbox FAIL → PASS; shop-side guard only, no PayPal Refund API call |
+| **F7 · prompt injection** | Sends an adversarial buyer chat prompt asking for an unapproved `$500.00` refund; checks that deterministic role + `$15.00` code guardrails reject it with `HTTP 403` | Local Sandbox FAIL → PASS; shop-side guard only, no PayPal Refund API call |
 
-## How we used the tools
+3. **Compare:** A deterministic reconciler queries PayPal Sandbox order evidence and the shop's per-order state, producing an objective `PASS`, `FAIL`, or `ERROR` verdict with exact monetary impact.
+4. **Rerun:** DriftGuard applies a proposed patch to a disposable copy of the shop, compiles TypeScript, and runs a **brand-new PayPal Sandbox order** under the same fault to prove the bug is fixed.
 
-- **PayPal Sandbox Orders** supplied the create, approve, capture, and order evidence for the local live runs. The demo shop is a controlled target, not a general PayPal integration scanner.
-- **mitmproxy** supplied fault timing and response substitution. Its active fault setting is shared, so the saved runs were sequential.
-- **Playwright** approved Sandbox orders as a buyer during local runs.
-- **Anthropic Claude** can propose patches, explain failures through Studio chat, and analyze observed evidence. The verdict always comes from deterministic code that compares PayPal and shop state. The seven saved product reruns in the table used curated patches (`DRIFTGUARD_LLM=none`); separate single-candidate Claude patch evaluations are linked in the [evaluation report](../evals/fixer/results/live-fixer-eval.md).
-- **AG Grid Community and AG Studio** present the run ledger and an interactive analysis canvas. The grid is a way to inspect evidence, not the mechanism that decides PASS.
-- **APIMatic context** was consulted while developing SDK guidance. It is not a runtime dependency in the hosted demo or a source of an automatically verified patch.
+The [hosted Render explorer](https://driftguard-dashboard.onrender.com) (`mock_runner`) lets judges inspect prepared `F1`–`F7` outcomes, run ledger evidence, and test **Ask Studio** without Docker or Sandbox credentials, while the full engine runs locally against real PayPal Sandbox.
 
-## What was difficult
+## How we built it
 
-The first temptation was to call every mismatch a PayPal failure. We had to separate the payment network from our own target shop. A webhook delivered twice can duplicate the shop's work, but it cannot create a second PayPal capture. The F7 assistant can set a refund flag in the demo shop, but that is not a real refund. We tightened the fixtures and wording to keep those boundaries visible.
+* **Core Engine & Chaos Proxy (`engine/`):** Built with **FastAPI**, **PostgreSQL / SQLite**, a `SKIP LOCKED` background worker, a PayPal REST order evidence client, a deterministic reconciler, and a zero-restart **mitmproxy** chaos router.
+* **Target Testbed (`targets/demo-shop/`, `targets/known-fixes/`):** An Express + TypeScript checkout using `@paypal/paypal-server-sdk`, seeded with intentional payment bugs (`BUG-01`–`BUG-10`) and curated patches.
+* **Automation, Fixer & Explainer (`ai/`):**
+  * **Playwright** automates Sandbox buyer approvals (`ai/buyer_driver/`).
+  * **Anthropic Claude** (`claude-haiku-5-5`, with optional Gemini and Groq failover) powers **Ask Studio** (`POST /llm/messages` with tool calls like `list_runs` and `explain_run`) to explain root causes from stored evidence, and can draft candidate patch diffs in `ai/fixer/` (validated by diff safety checks, behavior gates, and curated fallback).
+  * **APIMatic Context** was consulted during development to verify `@paypal/paypal-server-sdk 2.0.0` parameter names (`captureOrder`, `getOrder`, `paypalRequestId`) inside the fixer's `SDK_NOTES` guidance. It is not a runtime dependency.
+* **Dashboard & Studio UI (`dashboard/`):** Built with **React**, **TypeScript**, **Vite**, and **AG Studio (`ag-studio` / `ag-studio-react`)** for interactive data analysis, Before-and-After comparison sliders, run filtering, and light/dark theming.
 
-The patch loop needs a second, distinct order. A diff that applies, compiles, or looks plausible is only a candidate. The result matters after the patched shop meets the same fault and the reconciler reads the new order. We keep patch hashes and parent/child run IDs so that this step can be checked.
+## Challenges we ran into
 
-## What comes next
+* **Separating PayPal's ledger from shop state:** Early on, it was easy to conflate application bugs with network failures. For instance, replaying a webhook (`F6`) duplicates the shop's processing without creating a second PayPal capture, and `F7` tests shop-side refund guardrails rather than PayPal's Refund API. We tightened every reconciler rule, fixture, and UI label to keep those boundaries explicit.
+* **Proving fixes beyond syntax:** A patch that applies cleanly and compiles with `tsc` is only a candidate—some model-proposed `F1` patches added idempotency headers without querying PayPal order status after a timeout. We added behavior checks (`evals/fixer/checks.py`) and required every verified fix to pass on a fresh PayPal Sandbox order with a stored patch SHA-256 and parent/child run link.
+* **Environment & cross-service debugging:** We caught and resolved `httpx2` + `Brotli 1.1.0` decompression crashes (`mitmproxy` dependency conflict) in the Anthropic SDK client, scoped synthetic webhook IDs per order without dropping real PayPal event UUIDs, and prevented React polling updates from stealing focus inside AG Studio's AI panel.
 
-All seven faults (F1–F7) now have verified local Sandbox parent/child pairs saved in the [evaluation report](../evals/fixer/results/live-fixer-eval.md). Next, we plan to isolate mitmproxy fault settings per run for concurrent test execution, enforce container/VM isolation before allowing patch verification reruns on a public host, and expand beyond the seeded TypeScript shop with AST-level scanning.
+## Accomplishments that we're proud of
+
+* **End-to-end Sandbox proof across all 7 fault classes (`F1`–`F7`):** Recorded local PayPal Sandbox `FAIL` → `PASS` parent/child pairs with stored order IDs, capture IDs, and patch SHA-256 hashes (using curated patches in offline mode `DRIFTGUARD_LLM=none`, plus archived single-candidate Claude reruns for `F2`–`F4`) in [`evals/fixer/results/live-fixer-eval.md`](../evals/fixer/results/live-fixer-eval.md).
+* **Covering the full payment risk spectrum:** Going beyond basic network timeouts (`F1`, `F2`) and decline/invoice bugs (`F3`, `F4`) to catch IEEE 754 tax rounding drift (`F5`), webhook replay processing (`F6`), and AI support prompt-injection refund bypasses (`F7`).
+* **Strict separation of AI and ground truth ("AI proposes, code decides"):** Only deterministic reconciler code inspecting PayPal order evidence and shop state decides `PASS` or `FAIL`, and the Fixer requires both behavior checks and a fresh Sandbox checkout before a patch is marked verified.
+* **An honest, zero-setup explorer alongside the local engine:** Anyone can click through `F1`–`F7` runs, evidence ledgers, and Claude-backed Ask Studio on Render (`mode: "sample"` clearly labeled), while engineers can reproduce real Sandbox chaos locally with Docker, `mitmproxy`, and Playwright.
+
+## What we learned
+
+* **Idempotency keys alone don't heal dropped responses:** When we tested model-generated `F1` fixes, some patches added `PayPal-Request-Id` without querying PayPal order status (`getOrder`) after a timeout—meaning PayPal stayed at `1` capture while the shop's database remained at `0`. Reconciling upstream state before retrying is non-negotiable.
+* **Compiling is a weak bar for AI-generated patches:** A unified diff can apply cleanly and pass `tsc` while still failing the underlying payment invariant. Combining diff gates, behavioral checks, and a live rerun on a fresh order caught subtle failures that static checks missed.
+* **Prompt instructions cannot guard financial actions:** On `F7`, buyer-facing prompt rules gave way to adversarial phrasing; only deterministic backend caps (`$15.00` limit) and role checks (`HTTP 403` for non-admins) kept simulated refunds safe.
+* **Clear boundaries build trust in payment tooling:** Being explicit about where PayPal Sandbox ends and proxy or shop simulation begins (`F4`, `F6`, `F7`) made our architecture cleaner, our tests stricter, and our demo completely verifiable.
+
+## What's next for DriftGuard
+
+* **Per-run proxy isolation:** Scoping `mitmproxy` fault rules by request/run context so scenarios can run concurrently instead of sequentially.
+* **Isolated public execution:** Adding container/microVM boundaries so patch build-and-verify reruns can execute safely on public hosts without local setup.
+* **Broader SDK & AST scanning:** Expanding the pattern-based scanner to full Tree-sitter AST analysis beyond the seeded TypeScript demo shop, and extending live fault coverage to real duplicate-invoice rejections, webhook signature verification, and PayPal Refund/Dispute APIs.
 
 **Video link:** add the public three-minute video URL to the Devpost submission when it is ready. No video asset is stored in this repository.

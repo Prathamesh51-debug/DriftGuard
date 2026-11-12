@@ -151,6 +151,15 @@ The hosted API can call Anthropic if `ANTHROPIC_API_KEY` is set as a Render secr
 
 The scanner currently uses source patterns, not Tree-sitter. The demonstrated live path covers PayPal Orders create/capture and order evidence. Webhook signature verification, real PayPal refunds, and real duplicate-invoice rejection are outside the saved proof. The [study data](study/methodology.md) is exploratory annotation data; the repository does not contain enough source and run records to support population statistics.
 
+## Tools & sponsor integrations
+
+* **PayPal Sandbox & `@paypal/paypal-server-sdk`:** Powers Orders v2 create/capture in `targets/demo-shop/`, real Sandbox buyer approvals via Playwright, `PayPal-Request-Id` idempotency tests, `PayPal-Mock-Response` decline headers, `PAYMENT.CAPTURE.COMPLETED` webhook payloads, and authoritative order/capture ledger verification in `engine/reconciler/`.
+* **AG Studio (`ag-studio` / `ag-studio-react` by AG Grid):** Renders the interactive analytics workspace and Ask Studio chat canvas in `/live/studio` (with `AgGridReact` components also in `dashboard/`).
+* **APIMatic Context:** Consulted during development to check `@paypal/paypal-server-sdk 2.0.0` signatures inside `ai/fixer/prompt.py` (`SDK_NOTES`). It is not a runtime dependency.
+* **Render:** Hosts the two-service interactive preview (`driftguard-dashboard` static CDN + `driftguard-api` running `mock_runner`).
+* **Anthropic Claude (`claude-haiku-5-5`, with optional Gemini / Groq failover):** Powers **Ask Studio** (`POST /llm/messages` with `list_runs` and `explain_run` tools) to diagnose drift from stored evidence, and can draft candidate fixes/explanations in `ai/` behind deterministic diff and behavior gates.
+* **Core Stack:** Python (`FastAPI`, `Pydantic`, `mitmproxy`, `Playwright`, `pytest`), TypeScript/Node.js (`Express`, `React`, `Vite`, `Vitest`), and `PostgreSQL` / `SQLite`.
+
 ## Team
 
 | Teammate | Focus |
