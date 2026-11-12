@@ -33,6 +33,8 @@ def build_user_prompt(result: Result, scenario: Scenario, previous_error: Option
         f"Money impact (computed by code): {result.money_impact}",
         f"PayPal order IDs: {', '.join(ev.paypal_order_ids) or 'none'}",
         f"PayPal capture IDs: {', '.join(ev.paypal_capture_ids) or 'none'}",
+        f"PayPal refund IDs: {', '.join(ev.paypal_refund_ids) or 'none'}",
+        f"Webhook event IDs: {', '.join(ev.webhook_event_ids) or 'none'}",
     ]
     if result.error_message:
         lines.append(f"Error: {result.error_message}")

@@ -114,6 +114,18 @@ def test_drift_between_paypal_and_the_app_reaches_the_prompt_and_the_template(fa
     assert verify_text([out.headline, out.what_happened, out.impact], failing, scenario) == []
 
 
+def test_prompt_includes_refund_and_webhook_event_ids(failing, scenario):
+    from ai.explainer.prompt import build_user_prompt
+
+    failing_with_ids = failing.model_copy(deep=True)
+    failing_with_ids.evidence.paypal_refund_ids = ["REF-1111"]
+    failing_with_ids.evidence.webhook_event_ids = ["WH-2222"]
+    prompt = build_user_prompt(failing_with_ids, scenario)
+    assert "PayPal refund IDs: REF-1111" in prompt
+    assert "Webhook event IDs: WH-2222" in prompt
+
+
+
 def test_text_about_the_app_record_is_checked_like_any_other_figure(failing, scenario):
     good = "PayPal shows 1 capture of 38.97 USD, but the app recorded 0 captures."
     assert verify_text([good], failing, scenario) == []
