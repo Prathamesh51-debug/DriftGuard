@@ -300,7 +300,7 @@ export function FaultsPage({ runs, loading, offline, onLaunchFault, busy }: Page
                   </td>
                   <td>
                     <button
-                      className="btn s02-fault-run-btn"
+                      className="btn btn-primary s02-fault-run-btn"
                       type="button"
                       disabled={busy || offline || isLaunching}
                       onClick={() => void handleLaunch(fault.code)}

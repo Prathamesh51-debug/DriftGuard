@@ -486,11 +486,19 @@
   background: var(--panel-2);
 }
 
+.app.s02-live[data-theme='light'] .btn-primary {
+  color: #fff;
+}
+
 .s02-fault-run-btn {
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.s02-fault-run-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 .s02-run-view {
