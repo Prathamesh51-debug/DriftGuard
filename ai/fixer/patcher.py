@@ -24,7 +24,7 @@ class PatchCheck(BaseModel):
 
 def normalize_diff(diff: str) -> str:
     """Strip code fences and the repo-root prefix so paths are relative to the shop root."""
-    text = diff.strip("\n")
+    text = diff.replace("\r\n", "\n").replace("\r", "\n").strip("\n")
     text = re.sub(r"^```[a-z]*\n", "", text)
     text = re.sub(r"\n```$", "", text)
     lines = [line.replace(SHOP_PREFIX, "") if HEADER.match(line) else line for line in text.split("\n")]

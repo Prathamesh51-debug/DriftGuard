@@ -73,6 +73,15 @@ def test_fenced_reply_is_accepted(failing, scenario, bug):
     assert propose_fix(failing, scenario, bug, SHOP, ScriptedLLM([fenced])).applies
 
 
+def test_normalize_diff_handles_crlf_and_code_fences():
+    crlf_diff = "```diff\r\n--- a/targets/demo-shop/src/checkout.ts\r\n+++ b/targets/demo-shop/src/checkout.ts\r\n@@ -1,1 +1,1 @@\r\n-old\r\n+new\r\n```\r\n"
+    normalized = normalize_diff(crlf_diff)
+    assert "\r" not in normalized
+    assert "```" not in normalized
+    assert "--- a/src/checkout.ts\n+++ b/src/checkout.ts\n" in normalized
+
+
+
 def test_diff_touching_another_file_is_rejected_then_retried(failing, scenario, bug):
     wrong_file = GOOD_DIFF.replace("src/checkout.ts", "src/server.ts")
     llm = ScriptedLLM([reply(wrong_file), reply(GOOD_DIFF)])
@@ -208,3 +217,4 @@ def test_bug_09_guidance_prevents_duplicate_effects_across_checkout_and_webhook(
     notes = SDK_NOTES["F6_WEBHOOK_REPLAY"]
     assert "shopState.hasWebhookEvent(event.id)" in notes
     assert "captureCount" in notes
+
