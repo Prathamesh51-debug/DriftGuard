@@ -91,6 +91,10 @@ for i in range(1, 11):
         PATCH_HASHES[bug_id] = hashlib.sha256(diff_text.encode("utf-8")).hexdigest()
 
 
+class LaunchRunRequest(BaseModel):
+    fault: Optional[str] = None
+
+
 class FixRequest(BaseModel):
     scenario: Scenario
     result: Result
@@ -232,8 +236,23 @@ def list_runs() -> List[Run]:
 
 
 @app.post("/runs", response_model=Run, status_code=201)
-def launch_run() -> Run:
-    """Start a run. Defaults to F1 (lost capture response)."""
+def launch_run(body: Optional[LaunchRunRequest] = None) -> Run:
+    """Start a sample run. Defaults to F1 (lost capture response) unless a fault is specified."""
+    fault_name = body.fault if body else None
+    if fault_name is not None:
+        for key, sc in SCENARIOS.items():
+            sc_fault = sc.fault.value if hasattr(sc.fault, "value") else str(sc.fault)
+            if sc_fault == fault_name and key in RESULTS_FAIL:
+                return _view(_store(RESULTS_FAIL[key], scenario=sc))
+        valid_faults = sorted(
+            sc.fault.value if hasattr(sc.fault, "value") else str(sc.fault)
+            for sc in SCENARIOS.values()
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown fault '{fault_name}'. Valid values: {valid_faults}",
+        )
+
     sc = SCENARIOS.get("f1", list(SCENARIOS.values())[0])
     rf = RESULTS_FAIL.get("f1", list(RESULTS_FAIL.values())[0])
     return _view(_store(rf, scenario=sc))

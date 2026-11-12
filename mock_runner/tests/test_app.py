@@ -223,3 +223,16 @@ def test_paid_route_accept_encoding_header_and_x_forwarded_for_rate_limit(client
     assert empty_fwd.status_code == 200
     assert "" not in mock_app._ai_calls_by_ip
 
+
+def test_launch_run_supports_specific_faults_and_rejects_unknown(client):
+    created = client.post("/runs", json={"fault": "F3_FORCED_DECLINE"})
+    assert created.status_code == 201
+    run = created.json()
+    assert run["scenario"]["fault"] == "F3_FORCED_DECLINE"
+    assert Result.model_validate(run["result"]).verdict == Verdict.FAIL
+
+    bad = client.post("/runs", json={"fault": "F99_NONEXISTENT"})
+    assert bad.status_code == 422
+    assert "Unknown fault" in bad.json()["detail"]
+
+
